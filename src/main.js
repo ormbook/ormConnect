@@ -3,7 +3,6 @@ import { NongOrmAssistant } from './components/NongOrmAssistant.js';
 import { HostDashboard } from './components/HostDashboard.js';
 import { ConnectForm } from './components/ConnectForm.js';
 import { RemoteViewer } from './components/RemoteViewer.js';
-import { VirtualDesktop } from './components/VirtualDesktop.js';
 import { Manual } from './components/Manual.js';
 import { ChatDrawer } from './components/ChatDrawer.js';
 import { FileTransferModal } from './components/FileTransferModal.js';
@@ -14,7 +13,6 @@ class App {
     this.hostDashboard = null;
     this.connectForm = null;
     this.remoteViewer = null;
-    this.virtualDesktop = null;
     this.manual = null;
     this.chatDrawer = null;
     this.fileTransferModal = null;

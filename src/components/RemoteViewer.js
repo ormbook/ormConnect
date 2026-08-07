@@ -140,19 +140,6 @@ export class RemoteViewer {
       }
     });
 
-    if (btnDemoSim) {
-      btnDemoSim.addEventListener('click', () => {
-        const waitingOverlay = document.getElementById('remote-stream-waiting');
-        const canvas = document.getElementById('remote-canvas-fallback');
-        if (waitingOverlay) waitingOverlay.classList.add('hidden');
-        if (canvas) {
-          canvas.classList.remove('hidden');
-          this.startSimulatedCanvasScreen(canvas);
-          this.assistant.speak('เปิดโหมดจำลอง OS บน Remote Viewer เรียบร้อยค่ะ! ลองเลื่อนเมาส์และพิมพ์คีย์บอร์ดได้เลยค่ะ');
-        }
-      });
-    }
-
     // Toggle Input Control
     btnInput.addEventListener('click', () => {
       this.inputEnabled = !this.inputEnabled;
