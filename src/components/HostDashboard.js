@@ -111,6 +111,10 @@ export class HostDashboard {
         document.getElementById('display-host-status').innerText = 'กำลังสตรีมหน้าจอ (Active)';
         document.getElementById('display-host-status').style.color = 'var(--accent-emerald)';
 
+        if (this.sessionCode) {
+          socketService.emit('host:accept-connection', { sessionCode: this.sessionCode });
+        }
+
         await rtcService.startScreenShare();
         this.assistant.speak('อนุมัติและเริ่มสตรีมมิ่งหน้าจอสำเร็จค่ะ! คุณสามารถกดปิด Session หรือซ่อนหน้าต่างได้ตลอดเวลานะคะ');
       } catch (err) {

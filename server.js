@@ -109,52 +109,31 @@ io.on('connection', (socket) => {
     session.viewerSocketId = socket.id;
     socket.join(sessionCode);
 
-    console.log(`[Viewer] Socket ${socket.id} connected to session ${sessionCode}`);
+    console.log(`[Viewer] Socket ${socket.id} verified passcode for session ${sessionCode}`);
 
-    // Notify Host about incoming connection
+    // Notify Host about incoming connection request
     io.to(session.hostSocketId).emit('host:viewer-joined', {
       viewerSocketId: socket.id,
       permissions: session.permissions
     });
 
-    // Notify Viewer connection accepted
-    socket.emit('viewer:connect-success', {
+    // Notify Viewer to wait for Host approval
+    socket.emit('viewer:waiting-host-approval', {
       sessionCode,
-      permissions: session.permissions
+      message: 'รหัสผ่านถูกต้องค่ะ กำลังรอฝั่ง Host กดอนุมัติ...'
     });
   });
 
-  // WebRTC Signaling: Relay Offer from Host to Viewer or vice versa
-  socket.on('rtc:offer', ({ sessionCode, offer }) => {
-    socket.to(sessionCode).emit('rtc:offer', { offer, fromSocketId: socket.id });
-  });
-
-  // WebRTC Signaling: Relay Answer
-  socket.on('rtc:answer', ({ sessionCode, answer }) => {
-    socket.to(sessionCode).emit('rtc:answer', { answer, fromSocketId: socket.id });
-  });
-
-  // WebRTC Signaling: Relay ICE Candidate
-  socket.on('rtc:candidate', ({ sessionCode, candidate }) => {
-    socket.to(sessionCode).emit('rtc:candidate', { candidate, fromSocketId: socket.id });
-  });
-
-  // Chat message relay
-  socket.on('chat:message', ({ sessionCode, sender, text, timestamp }) => {
-    io.to(sessionCode).emit('chat:message', { sender, text, timestamp });
-  });
-
-  // File Transfer meta relay
-  socket.on('file:transfer-request', ({ sessionCode, fileName, fileSize, fileType }) => {
-    socket.to(sessionCode).emit('file:transfer-request', { fileName, fileSize, fileType, senderId: socket.id });
-  });
-
-  socket.on('file:transfer-accept', ({ sessionCode }) => {
-    socket.to(sessionCode).emit('file:transfer-accept');
-  });
-
-  socket.on('file:transfer-decline', ({ sessionCode }) => {
-    socket.to(sessionCode).emit('file:transfer-decline');
+  // Host accepts connection request
+  socket.on('host:accept-connection', ({ sessionCode }) => {
+    console.log(`[Host] Accepted connection for session ${sessionCode}`);
+    const session = sessions.get(sessionCode);
+    if (session && session.viewerSocketId) {
+      io.to(session.viewerSocketId).emit('viewer:connect-approved', {
+        sessionCode,
+        permissions: session.permissions
+      });
+    }
   });
 
   // Host declines connection request
@@ -163,17 +142,11 @@ io.on('connection', (socket) => {
     const session = sessions.get(sessionCode);
     if (session) {
       if (session.viewerSocketId) {
-        io.to(session.viewerSocketId).emit('viewer:connection-declined', {
-          message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
-        });
-        io.to(session.viewerSocketId).emit('session:ended', {
+        io.to(session.viewerSocketId).emit('viewer:connect-declined', {
           message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
         });
       }
-      io.to(sessionCode).emit('viewer:connection-declined', {
-        message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
-      });
-      io.to(sessionCode).emit('session:ended', {
+      io.to(sessionCode).emit('viewer:connect-declined', {
         message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
       });
       session.viewerSocketId = null;

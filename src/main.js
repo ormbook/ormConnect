@@ -51,8 +51,7 @@ class App {
       this.fileTransferModal.sessionCode = sessionCode;
     });
 
-    // 6. Initialize Simulator & Manual
-    this.virtualDesktop = new VirtualDesktop('virtual-desktop-container', this.assistant);
+    // 6. Initialize Manual
     this.manual = new Manual('manual-container', this.assistant);
 
     // 7. Navigation Tabs Router
@@ -78,16 +77,14 @@ class App {
 
   setupNavigation() {
     const navConnect = document.getElementById('nav-connect');
-    const navSimulator = document.getElementById('nav-simulator');
     const navManual = document.getElementById('nav-manual');
 
     const secConnect = document.getElementById('section-connect');
-    const secSimulator = document.getElementById('section-simulator');
     const secManual = document.getElementById('section-manual');
 
     const switchTab = (activeNav, activeSec, assistantMsg) => {
-      [navConnect, navSimulator, navManual].forEach(btn => btn.classList.remove('active'));
-      [secConnect, secSimulator, secManual].forEach(sec => sec.classList.remove('active'));
+      [navConnect, navManual].forEach(btn => btn.classList.remove('active'));
+      [secConnect, secManual].forEach(sec => sec.classList.remove('active'));
 
       activeNav.classList.add('active');
       activeSec.classList.add('active');
@@ -97,10 +94,6 @@ class App {
 
     navConnect.addEventListener('click', () => {
       switchTab(navConnect, secConnect, 'ยินดีต้อนรับสู่หน้าควบคุมรีโมทค่ะ! คุณสามารถสร้างรหัสแชร์หน้าจอ หรือใส่รหัส ID 9 หลักเพื่อเชื่อมต่อได้เลยนะคะ');
-    });
-
-    navSimulator.addEventListener('click', () => {
-      switchTab(navSimulator, secSimulator, 'เข้าสู่โหมดจำลอง OS (Simulator) แล้วค่ะ! คุณสามารถทดลองใช้เมาส์และคีย์บอร์ดพิมพ์ในโปรแกรมจำลองได้ทันทีเลยนะคะ');
     });
 
     navManual.addEventListener('click', () => {

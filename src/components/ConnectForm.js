@@ -108,8 +108,12 @@ export class ConnectForm {
       this.assistant.speak('พบ Session แล้วค่ะ! กรุณากรอกรหัสผ่าน Passcode 4 หลักของเพื่อนลงในช่องด้านล่างแล้วกด Connect นะคะ');
     });
 
-    socketService.on('viewer:connect-success', ({ sessionCode, permissions }) => {
-      this.assistant.speak('ยืนยันรหัสถูกต้องค่ะ! กำลังเปิดหน้าต่าง Remote Viewer...');
+    socketService.on('viewer:waiting-host-approval', ({ message }) => {
+      this.assistant.speak(`⏳ ${message}`);
+    });
+
+    socketService.on('viewer:connect-approved', ({ sessionCode, permissions }) => {
+      this.assistant.speak('ฝั่ง Host อนุมัติการเชื่อมต่อแล้วค่ะ! กำลังเปิดหน้าต่างสตรีมมิ่ง...');
       
       // Initialize WebRTC as Viewer
       rtcService.initWebRTC(sessionCode, false);
@@ -117,6 +121,12 @@ export class ConnectForm {
       if (this.onConnectSuccess) {
         this.onConnectSuccess(sessionCode, permissions);
       }
+    });
+
+    socketService.on('viewer:connect-declined', ({ message }) => {
+      passcodeGroup.classList.add('hidden');
+      inputPasscode.value = '';
+      this.assistant.notifyError(message || 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ');
     });
 
     socketService.on('viewer:connect-error', ({ message }) => {

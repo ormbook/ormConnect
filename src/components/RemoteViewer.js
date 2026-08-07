@@ -85,14 +85,8 @@ export class RemoteViewer {
             กำลังรอการสตรีมหน้าจอจากปลายทาง...
           </h2>
           <p style="font-size: 0.9rem; color: var(--text-muted); max-width: 480px; margin-bottom: 1.5rem; line-height: 1.6;">
-            เชื่อมต่อ P2P DataChannel สำเร็จแล้ว! เมื่อเครื่องปลายทางกดอนุญาตแชร์หน้าจอ ภาพจะปรากฏขึ้นบนจอของคุณทันทีค่ะ
+            เชื่อมต่อสำเร็จแล้วค่ะ! เมื่อเครื่องปลายทางกดอนุญาตแชร์หน้าจอ ภาพจะปรากฏขึ้นบนจอของคุณทันทีค่ะ
           </p>
-
-          <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
-            <button id="btn-demo-sim-screen" class="btn-primary" style="width: auto; padding: 0.6rem 1.25rem;">
-              <i class="fa-solid fa-gamepad"></i> เปิดโหมดจำลอง OS (Interactive Simulator Screen)
-            </button>
-          </div>
         </div>
 
         <video id="remote-video-stream" autoplay playsinline muted class="hidden"></video>

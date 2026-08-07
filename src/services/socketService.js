@@ -44,6 +44,8 @@ class SocketService {
       'host:session-created',
       'host:viewer-joined',
       'viewer:require-passcode',
+      'viewer:waiting-host-approval',
+      'viewer:connect-approved',
       'viewer:connect-success',
       'viewer:connect-error',
       'rtc:offer',
