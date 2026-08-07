@@ -140,17 +140,40 @@
 
                 <button id="btn-connect-remote" class="btn-primary" style="margin-top: 0.5rem;" onclick="
                   const codeInput = document.getElementById('input-session-code');
-                  const code = codeInput ? codeInput.value.trim() : '';
-                  const passGroup = document.getElementById('passcode-input-group');
                   const passInput = document.getElementById('input-passcode');
+                  const passGroup = document.getElementById('passcode-input-group');
+                  const statusBox = document.getElementById('viewer-status-card');
+                  const btn = document.getElementById('btn-connect-remote');
+                  
+                  const code = codeInput ? codeInput.value.trim() : '';
+                  const pass = passInput ? passInput.value.trim() : '';
+
                   if (!code) {
                     alert('กรุณากรอก Session ID 9 หลักก่อนนะคะ');
-                  } else if (passGroup && passGroup.classList.contains('hidden')) {
+                    return;
+                  }
+                  
+                  if (passGroup && passGroup.classList.contains('hidden')) {
                     passGroup.classList.remove('hidden');
                     if (passInput) passInput.focus();
-                  } else {
-                    if (window.submitConnectRemote) window.submitConnectRemote();
+                    return;
                   }
+
+                  if (!pass) {
+                    alert('กรุณากรอก Passcode 4 หลักของปลายทางด้วยนะคะ');
+                    return;
+                  }
+
+                  if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class=&quot;fa-solid fa-spinner fa-spin&quot;></i> กำลังส่งคำขอไปยัง Host...';
+                  }
+                  if (statusBox) {
+                    statusBox.classList.remove('hidden');
+                    statusBox.innerHTML = '<i class=&quot;fa-solid fa-clock fa-spin&quot; style=&quot;color: var(--primary-cyan); font-size: 1.6rem; margin-bottom: 0.5rem;&quot;></i><div style=&quot;font-size: 1rem; font-weight: 700; color: #fff;&quot;>ส่งคำขอเชื่อมต่อสำเร็จแล้วค่ะ!</div><p style=&quot;font-size: 0.85rem; color: var(--text-muted); margin-top: 0.3rem;&quot;>กำลังรอให้ฝั่ง Host กดปุ่ม &quot;อนุมัติ &amp; เริ่มแชร์หน้าจอ&quot;</p>';
+                  }
+
+                  if (window.submitConnectRemote) window.submitConnectRemote();
                 ">
                   <i class="fa-solid fa-plug"></i> เชื่อมต่อเข้าควบคุม (Connect)
                 </button>
