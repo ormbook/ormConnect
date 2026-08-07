@@ -164,19 +164,39 @@ io.on('connection', (socket) => {
     sessions.delete(sessionCode);
   });
 
-  // Socket disconnected
+  // Socket disconnected with 60-second grace period (supports mobile tab switching & screen lock)
   socket.on('disconnect', () => {
     console.log(`[Socket] Client disconnected: ${socket.id}`);
-    
-    // Find and clean up any sessions associated with this socket
+
     for (const [code, session] of sessions.entries()) {
-      if (session.hostSocketId === socket.id || session.viewerSocketId === socket.id) {
-        io.to(code).emit('session:ended', { message: 'ผู้ใช้งานตัดการเชื่อมต่อแล้วค่ะ' });
-        sessions.delete(code);
+      if (session.hostSocketId === socket.id) {
+        session.hostDisconnectedTimer = setTimeout(() => {
+          console.log(`[Session] Host disconnected timeout for session ${code}. Removing.`);
+          io.to(code).emit('session:ended', { message: 'ผู้ใช้งานฝั่ง Host ตัดการเชื่อมต่อแล้วค่ะ' });
+          sessions.delete(code);
+        }, 60000); // 60 seconds grace period for Host socket reconnect
+      } else if (session.viewerSocketId === socket.id) {
+        session.viewerDisconnectedTimer = setTimeout(() => {
+          console.log(`[Session] Viewer disconnected timeout for session ${code}. Removing.`);
+          io.to(code).emit('session:ended', { message: 'ผู้ใช้งานฝั่ง Viewer ตัดการเชื่อมต่อแล้วค่ะ' });
+          session.viewerSocketId = null;
+        }, 60000); // 60 seconds grace period for Viewer socket reconnect
       }
     }
   });
 });
+
+// Periodic cleanup for idle sessions older than 30 minutes (30 mins TTL)
+setInterval(() => {
+  const now = Date.now();
+  const THIRTY_MINUTES = 30 * 60 * 1000;
+  for (const [code, session] of sessions.entries()) {
+    if (now - session.createdAt > THIRTY_MINUTES && !session.viewerSocketId) {
+      console.log(`[Session] Session ${code} expired after 30 minutes idle.`);
+      sessions.delete(code);
+    }
+  }
+}, 60000);
 
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
