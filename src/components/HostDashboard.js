@@ -138,42 +138,60 @@ export class HostDashboard {
       });
     }
 
-    btnStart.addEventListener('click', () => {
-      // Check for LINE / FB In-App browser on iOS
-      const ua = navigator.userAgent || '';
-      const isIOS = /iPad|iPhone|iPod/.test(ua);
-      const isInApp = /Line|FB_IAB|FB4A|Instagram/i.test(ua);
+    if (btnStart) {
+      btnStart.addEventListener('click', () => {
+        btnStart.disabled = true;
+        btnStart.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังสร้าง Session...';
 
-      if (isIOS && isInApp) {
-        this.assistant.speak('💡 **ข้อแนะนำสำหรับ iPhone:** คุณเปิดลิงก์ผ่านแอป LINE/Facebook แนะนำให้กดปุ่ม 3 จุดแล้วเลือก **"Open in Safari (เปิดใน Safari)"** เพื่อให้ระบบรองรับการแชร์หน้าจอมือถือได้ 100% นะคะ');
-      }
+        // Check for LINE / FB In-App browser on iOS
+        const ua = navigator.userAgent || '';
+        const isIOS = /iPad|iPhone|iPod/.test(ua);
+        const isInApp = /Line|FB_IAB|FB4A|Instagram/i.test(ua);
 
-      const permissions = permSelect.value;
-      socketService.emit('host:create-session', { permissions });
-    });
+        if (isIOS && isInApp) {
+          this.assistant.speak('💡 **ข้อแนะนำสำหรับ iPhone:** คุณเปิดลิงก์ผ่านแอป LINE/Facebook แนะนำให้กดปุ่ม 3 จุดแล้วเลือก **"Open in Safari (เปิดใน Safari)"** เพื่อให้ระบบรองรับการแชร์หน้าจอมือถือได้ 100% นะคะ');
+        }
 
-    btnStop.addEventListener('click', () => {
-      this.stopHosting();
-    });
+        const permissions = permSelect ? permSelect.value : 'full';
+        socketService.emit('host:create-session', { permissions });
+      });
+    }
 
-    btnCopy.addEventListener('click', () => {
-      if (this.sessionCode && this.passcode) {
-        navigator.clipboard.writeText(`ormConnect ID: ${this.sessionCode} | Passcode: ${this.passcode}`);
-        this.assistant.speak('คัดลอกรหัสเรียบร้อยแล้วค่ะ! ส่งให้เพื่อนผ่านแชทได้เลยนะคะ 👍');
-      }
-    });
+    if (btnStop) {
+      btnStop.addEventListener('click', () => {
+        this.stopHosting();
+      });
+    }
+
+    if (btnCopy) {
+      btnCopy.addEventListener('click', () => {
+        if (this.sessionCode && this.passcode) {
+          navigator.clipboard.writeText(`ormConnect ID: ${this.sessionCode} | Passcode: ${this.passcode}`);
+          this.assistant.speak('คัดลอกรหัสเรียบร้อยแล้วค่ะ! ส่งให้เพื่อนผ่านแชทได้เลยนะคะ 👍');
+        }
+      });
+    }
 
     // Listen for Socket Events
     socketService.on('host:session-created', ({ sessionCode, passcode }) => {
+      if (btnStart) {
+        btnStart.disabled = false;
+        btnStart.innerHTML = '<i class="fa-solid fa-play"></i> เริ่มสร้าง Session แชร์หน้าจอ';
+      }
+
       this.sessionCode = sessionCode;
       this.passcode = passcode;
       this.isHosting = true;
 
-      document.getElementById('host-start-panel').classList.add('hidden');
-      document.getElementById('host-active-panel').classList.remove('hidden');
+      const startPanel = document.getElementById('host-start-panel');
+      const activePanel = document.getElementById('host-active-panel');
+      if (startPanel) startPanel.classList.add('hidden');
+      if (activePanel) activePanel.classList.remove('hidden');
 
-      document.getElementById('display-session-code').innerText = sessionCode;
-      document.getElementById('display-passcode').innerText = passcode;
+      const dispCode = document.getElementById('display-session-code');
+      const dispPass = document.getElementById('display-passcode');
+      if (dispCode) dispCode.innerText = sessionCode;
+      if (dispPass) dispPass.innerText = passcode;
 
       // Initialize WebRTC as Host
       rtcService.initWebRTC(sessionCode, true);

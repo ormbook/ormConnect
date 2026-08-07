@@ -67,6 +67,9 @@ class SocketService {
   }
 
   emit(eventName, data) {
+    if (!this.socket || !this.connected) {
+      this.connect();
+    }
     if (this.socket) {
       this.socket.emit(eventName, data);
     }
