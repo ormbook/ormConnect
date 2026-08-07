@@ -12,47 +12,49 @@ export class ConnectForm {
   }
 
   render() {
-    this.container.innerHTML = `
-      <div class="glass-card">
-        <h2 class="card-title">
-          <i class="fa-solid fa-link" style="color: var(--primary-cyan);"></i> เชื่อมต่อปลายทาง (Connect Remote PC)
-        </h2>
-        <p class="card-subtitle">กรอกรหัส Session ID 9 หลักของเครื่องเพื่อนที่คุณต้องการรีโมทไปควบคุม</p>
+    if (!document.getElementById('btn-connect-remote')) {
+      this.container.innerHTML = `
+        <div class="glass-card">
+          <h2 class="card-title">
+            <i class="fa-solid fa-link" style="color: var(--primary-cyan);"></i> เชื่อมต่อปลายทาง (Connect Remote PC)
+          </h2>
+          <p class="card-subtitle">กรอกรหัส Session ID 9 หลักของเครื่องเพื่อนที่คุณต้องการรีโมทไปควบคุม</p>
 
-        <!-- Form Panel -->
-        <div id="connect-input-panel">
-          <div class="input-group">
-            <label class="input-label">Remote Session ID (9 หลัก)</label>
-            <input type="text" id="input-session-code" class="glass-input" 
-                   placeholder="เช่น 384-912-705" maxlength="11" style="font-size: 1.2rem; font-weight: 600; letter-spacing: 1px;" />
+          <!-- Form Panel -->
+          <div id="connect-input-panel">
+            <div class="input-group">
+              <label class="input-label">Remote Session ID (9 หลัก)</label>
+              <input type="text" id="input-session-code" class="glass-input" 
+                     placeholder="เช่น 384-912-705" maxlength="11" style="font-size: 1.2rem; font-weight: 600; letter-spacing: 1px;" />
+            </div>
+
+            <!-- Passcode Input (Hidden until required) -->
+            <div id="passcode-input-group" class="input-group hidden">
+              <label class="input-label" style="color: var(--accent-emerald);">
+                <i class="fa-solid fa-lock"></i> ใส่ Passcode 4 หลักของปลายทาง
+              </label>
+              <input type="password" id="input-passcode" class="glass-input" placeholder="****" maxlength="6" style="font-size: 1.2rem; text-align: center;" />
+            </div>
+
+            <button id="btn-connect-remote" class="btn-primary" style="margin-top: 0.5rem;">
+              <i class="fa-solid fa-plug"></i> เชื่อมต่อเข้าควบคุม (Connect)
+            </button>
           </div>
 
-          <!-- Passcode Input (Hidden until required) -->
-          <div id="passcode-input-group" class="input-group hidden">
-            <label class="input-label" style="color: var(--accent-emerald);">
-              <i class="fa-solid fa-lock"></i> ใส่ Passcode 4 หลักของปลายทาง
-            </label>
-            <input type="password" id="input-passcode" class="glass-input" placeholder="****" maxlength="6" style="font-size: 1.2rem; text-align: center;" />
-          </div>
-
-          <button id="btn-connect-remote" class="btn-primary" style="margin-top: 0.5rem;">
-            <i class="fa-solid fa-plug"></i> เชื่อมต่อเข้าควบคุม (Connect)
-          </button>
-        </div>
-
-        <!-- Recent Connections History -->
-        <div style="margin-top: 2rem; border-top: 1px solid var(--border-glass); padding-top: 1rem;">
-          <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">
-            <i class="fa-solid fa-history"></i> ประวัติการเชื่อมต่อล่าสุด
-          </span>
-          <div id="recent-connections-list" style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
-            <span class="badge badge-cyan" style="cursor: pointer;" onclick="document.getElementById('input-session-code').value='384-912-705'">
-              384-912-705 (Demo PC)
+          <!-- Recent Connections History -->
+          <div style="margin-top: 2rem; border-top: 1px solid var(--border-glass); padding-top: 1rem;">
+            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">
+              <i class="fa-solid fa-history"></i> ประวัติการเชื่อมต่อล่าสุด
             </span>
+            <div id="recent-connections-list" style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              <span class="badge badge-cyan" style="cursor: pointer;" onclick="document.getElementById('input-session-code').value='384-912-705'">
+                384-912-705 (Demo PC)
+              </span>
+            </div>
           </div>
         </div>
-      </div>
-    `;
+      `;
+    }
 
     this.bindEvents();
   }

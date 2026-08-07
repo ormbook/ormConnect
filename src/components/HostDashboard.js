@@ -13,7 +13,8 @@ export class HostDashboard {
   }
 
   render() {
-    this.container.innerHTML = `
+    if (!document.getElementById('btn-start-hosting')) {
+      this.container.innerHTML = `
       <div class="glass-card">
         <h2 class="card-title">
           <i class="fa-solid fa-desktop" style="color: var(--primary-cyan);"></i> แชร์หน้าจอเครื่องนี้ (Host My PC)
@@ -90,6 +91,7 @@ export class HostDashboard {
         </div>
       </div>
     `;
+    }
 
     this.bindEvents();
   }
