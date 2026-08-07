@@ -142,7 +142,29 @@ class RTCService {
     const ctx = canvas.getContext('2d');
     let frame = 0;
 
+    let mouseX = canvas.width / 2;
+    let mouseY = canvas.height / 2;
+    let isMouseDown = false;
+    let lastKey = '';
+
+    // Listen to input events to make the simulation interactive
+    this.on('input-event', (data) => {
+      if (data.type === 'mousemove') {
+        mouseX = data.payload.xRatio * canvas.width;
+        mouseY = data.payload.yRatio * canvas.height;
+      } else if (data.type === 'mousedown') {
+        isMouseDown = true;
+      } else if (data.type === 'mouseup') {
+        isMouseDown = false;
+      } else if (data.type === 'keydown') {
+        lastKey = data.payload.key;
+      } else if (data.type === 'shortcut') {
+        lastKey = data.payload.combo;
+      }
+    });
+
     const draw = () => {
+      if (!this.localStream) return; // stop loop if stream closed
       frame++;
       ctx.fillStyle = '#0b0f19';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -180,14 +202,10 @@ class RTCService {
       ctx.fillText('Host desktop is streaming via WebRTC P2P.', 180, 160);
       ctx.fillText('Interactive input channel is listening...', 180, 185);
 
-      // Animated Cursor Movement
-      const cursorX = canvas.width / 2 + Math.sin(frame * 0.05) * 200;
-      const cursorY = canvas.height / 2 + Math.cos(frame * 0.05) * 100;
-
-      ctx.fillStyle = '#00f0ff';
-      ctx.beginPath(); ctx.arc(cursorX, cursorY, 7, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.5)';
-      ctx.beginPath(); ctx.arc(cursorX, cursorY, 12 + (frame % 15), 0, Math.PI * 2); ctx.stroke();
+      if (lastKey) {
+        ctx.fillStyle = '#fde047';
+        ctx.fillText(`Key Pressed: ${lastKey}`, 180, 215);
+      }
 
       // Taskbar
       ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
@@ -195,6 +213,12 @@ class RTCService {
       ctx.fillStyle = '#00f0ff';
       ctx.font = '700 14px Outfit, sans-serif';
       ctx.fillText('❖ Start', 20, canvas.height - 18);
+
+      // Interactive Cursor
+      ctx.fillStyle = isMouseDown ? 'rgba(255, 50, 50, 0.9)' : '#00f0ff';
+      ctx.beginPath(); ctx.arc(mouseX, mouseY, isMouseDown ? 10 : 7, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = isMouseDown ? 'rgba(255, 50, 50, 0.5)' : 'rgba(0, 240, 255, 0.5)';
+      ctx.beginPath(); ctx.arc(mouseX, mouseY, 12 + (frame % 15), 0, Math.PI * 2); ctx.stroke();
 
       requestAnimationFrame(draw);
     };

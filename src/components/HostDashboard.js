@@ -10,6 +10,37 @@ export class HostDashboard {
     this.isHosting = false;
 
     this.render();
+
+    // Session Recovery on Refresh
+    const savedSession = sessionStorage.getItem('orm_host_session');
+    if (savedSession) {
+      try {
+        const { sessionCode, passcode } = JSON.parse(savedSession);
+        this.sessionCode = sessionCode;
+        this.passcode = passcode;
+        this.isHosting = true;
+        // Wait a tick for DOM to be ready
+        setTimeout(() => this.recoverUIState(), 0);
+      } catch (err) {}
+    }
+  }
+
+  recoverUIState() {
+    const startPanel = document.getElementById('host-start-panel');
+    const activePanel = document.getElementById('host-active-panel');
+    if (startPanel) startPanel.classList.add('hidden');
+    if (activePanel) activePanel.classList.remove('hidden');
+
+    const dispCode = document.getElementById('display-session-code');
+    const dispPass = document.getElementById('display-passcode');
+    if (dispCode) dispCode.innerText = this.sessionCode;
+    if (dispPass) dispPass.innerText = this.passcode;
+    document.getElementById('display-host-status').innerText = 'กำลังกู้คืน Session...';
+
+    // If socket is already connected, emit recovery
+    if (socketService.socket && socketService.socket.connected) {
+      socketService.emit('host:recover-session', { sessionCode: this.sessionCode, passcode: this.passcode });
+    }
   }
 
   render() {
@@ -155,6 +186,7 @@ export class HostDashboard {
       this.sessionCode = sessionCode;
       this.passcode = passcode;
       this.isHosting = true;
+      sessionStorage.setItem('orm_host_session', JSON.stringify({ sessionCode, passcode }));
 
       // Instantly update UI DOM (0ms response time)
       const startPanel = document.getElementById('host-start-panel');
@@ -231,6 +263,34 @@ export class HostDashboard {
       this.assistant.notifySessionCreated(sessionCode, passcode);
     });
 
+    socketService.on('session:ended', ({ message }) => {
+      this.stopHosting(false); // don't emit disconnect if server ended it
+      this.assistant.notifyError(message || 'Session ถูกปิดแล้วค่ะ');
+    });
+
+    socketService.on('host:session-recovered', ({ sessionCode, hasViewer }) => {
+      const activePanel = document.getElementById('host-active-panel');
+      const startPanel = document.getElementById('host-start-panel');
+      if (startPanel) startPanel.classList.add('hidden');
+      if (activePanel) activePanel.classList.remove('hidden');
+      document.getElementById('display-session-code').innerText = sessionCode;
+      document.getElementById('display-passcode').innerText = this.passcode;
+
+      document.getElementById('display-host-status').innerText = hasViewer ? 'กำลังถูกควบคุม (Active)' : 'รอเพื่อนเชื่อมต่อ...';
+      document.getElementById('display-host-status').style.color = hasViewer ? 'var(--accent-emerald)' : 'var(--accent-amber)';
+      this.assistant.speak('กู้คืน Session สำเร็จค่ะ');
+      if (hasViewer) {
+        rtcService.initWebRTC(sessionCode, true);
+        rtcService.startScreenShare();
+      }
+    });
+
+    socketService.on('status-change', ({ connected }) => {
+      if (connected && this.isHosting && this.sessionCode) {
+        socketService.emit('host:recover-session', { sessionCode: this.sessionCode, passcode: this.passcode });
+      }
+    });
+
     socketService.on('host:viewer-joined', async () => {
       document.getElementById('display-host-status').innerText = 'มีคำขอเชื่อมต่อเข้ามา (รอการอนุมัติ)...';
       document.getElementById('display-host-status').style.color = 'var(--accent-amber)';
@@ -244,11 +304,13 @@ export class HostDashboard {
     });
   }
 
-  stopHosting() {
-    if (this.sessionCode) {
+  stopHosting(emitDisconnect = true) {
+    if (this.sessionCode && emitDisconnect) {
       socketService.emit('session:disconnect', { sessionCode: this.sessionCode });
-      rtcService.close();
     }
+    rtcService.close();
+    sessionStorage.removeItem('orm_host_session');
+
     this.sessionCode = null;
     this.passcode = null;
     this.isHosting = false;
