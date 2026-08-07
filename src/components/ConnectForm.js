@@ -79,29 +79,43 @@ export class ConnectForm {
       e.target.value = formatted;
     });
 
-    btnConnect.addEventListener('click', () => {
-      const code = inputCode.value.trim();
+    window.submitConnectRemote = () => {
+      console.log('[ConnectForm] submitConnectRemote triggered!');
+      const inputCodeEl = document.getElementById('input-session-code');
+      const inputPasscodeEl = document.getElementById('input-passcode');
+      const passcodeGroupEl = document.getElementById('passcode-input-group');
+
+      const code = inputCodeEl ? inputCodeEl.value.trim() : '';
       if (!code) {
-        return this.assistant.notifyError('กรุณากรอก Session ID 9 หลักก่อนนะคะ');
+        if (this.assistant) this.assistant.notifyError('กรุณากรอก Session ID 9 หลักก่อนนะคะ');
+        return;
       }
 
-      if (passcodeGroup.classList.contains('hidden')) {
-        // Step 1: Submit code to check if session exists
+      if (passcodeGroupEl && passcodeGroupEl.classList.contains('hidden')) {
+        // Step 1: Reveal passcode group instantly and request connect
         this.targetSessionCode = code;
+        passcodeGroupEl.classList.remove('hidden');
+        if (inputPasscodeEl) inputPasscodeEl.focus();
         socketService.emit('viewer:request-connect', { sessionCode: code });
-        this.assistant.speak(`น้องออมกำลังค้นหา Session ID <b>${code}</b>...`);
+        if (this.assistant) this.assistant.speak(`พบ Session <b>${code}</b> แล้วค่ะ! กรุณากรอก Passcode 4 หลักแล้วกด Connect นะคะ`);
       } else {
         // Step 2: Submit passcode
-        const passcode = inputPasscode.value.trim();
+        const passcode = inputPasscodeEl ? inputPasscodeEl.value.trim() : '';
         if (!passcode) {
-          return this.assistant.notifyError('กรุณากรอก Passcode ด้วยนะคะ');
+          if (this.assistant) this.assistant.notifyError('กรุณากรอก Passcode ด้วยนะคะ');
+          return;
         }
         socketService.emit('viewer:verify-passcode', {
-          sessionCode: this.targetSessionCode,
+          sessionCode: this.targetSessionCode || code,
           passcode
         });
+        if (this.assistant) this.assistant.speak('กำลังตรวจสอบรหัสผ่านและส่งคำขอไปยังฝั่ง Host ค่ะ...');
       }
-    });
+    };
+
+    if (btnConnect) {
+      btnConnect.addEventListener('click', window.submitConnectRemote);
+    }
 
     // Socket Response Events
     socketService.on('viewer:require-passcode', () => {
