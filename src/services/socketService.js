@@ -10,10 +10,12 @@ class SocketService {
   connect() {
     if (this.socket) return;
 
-    // Connect to current origin or fallback to localhost:3000
-    const serverUrl = window.location.origin.includes('5173') 
-      ? 'http://localhost:3000' 
-      : window.location.origin;
+    // Connect to VITE_SIGNALING_URL, current origin, or fallback to localhost:3000
+    const serverUrl = import.meta.env.VITE_SIGNALING_URL || (
+      window.location.origin.includes('5173') 
+        ? 'http://localhost:3000' 
+        : window.location.origin
+    );
 
     this.socket = io(serverUrl, {
       reconnectionAttempts: 10,
