@@ -160,9 +160,24 @@ io.on('connection', (socket) => {
   // Host declines connection request
   socket.on('host:decline-connection', ({ sessionCode }) => {
     console.log(`[Host] Declined connection for session ${sessionCode}`);
-    socket.to(sessionCode).emit('viewer:connection-declined', {
-      message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
-    });
+    const session = sessions.get(sessionCode);
+    if (session) {
+      if (session.viewerSocketId) {
+        io.to(session.viewerSocketId).emit('viewer:connection-declined', {
+          message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
+        });
+        io.to(session.viewerSocketId).emit('session:ended', {
+          message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
+        });
+      }
+      io.to(sessionCode).emit('viewer:connection-declined', {
+        message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
+      });
+      io.to(sessionCode).emit('session:ended', {
+        message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
+      });
+      session.viewerSocketId = null;
+    }
   });
 
   // Disconnect session explicitly

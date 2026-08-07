@@ -136,32 +136,15 @@ export class RemoteViewer {
     // Listen for decline or disconnect events from socket
     socketService.on('viewer:connection-declined', ({ message }) => {
       this.closeSession();
-      this.assistant.speak(message || 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ');
+      this.assistant.notifyError(message || 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ (ตัดสายแล้ว)');
     });
 
     socketService.on('session:ended', ({ message }) => {
       if (!this.overlay.classList.contains('hidden')) {
         this.closeSession();
-        this.assistant.speak(message || 'การเชื่อมต่อถูกตัดแล้วค่ะ');
+        this.assistant.notifyError(message || 'การเชื่อมต่อถูกตัดแล้วค่ะ');
       }
     });
-
-    this.assistant.speak('กำลังรอสัญญาณสตรีมหน้าจอจากเครื่องปลายทางค่ะ! หากปลายทางเป็นเครื่องทดสอบ สามารถกดเปิดโหมดจำลอง OS ได้เลยนะคะ');
-  }
-
-  bindEvents() {
-    const videoEl = document.getElementById('remote-video-stream');
-    const screenWrap = document.getElementById('remote-screen-wrap');
-    const btnDisconnect = document.getElementById('tool-btn-disconnect');
-    const btnFullscreen = document.getElementById('tool-btn-fullscreen');
-    const btnInput = document.getElementById('tool-btn-input');
-    const btnChat = document.getElementById('tool-btn-chat');
-    const btnFile = document.getElementById('tool-btn-file');
-
-    const btnCAD = document.getElementById('shortcut-ctrl-alt-del');
-    const btnTab = document.getElementById('shortcut-alt-tab');
-    const btnWin = document.getElementById('shortcut-win-key');
-    const btnDemoSim = document.getElementById('btn-demo-sim-screen');
 
     if (btnDemoSim) {
       btnDemoSim.addEventListener('click', () => {
