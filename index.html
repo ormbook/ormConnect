@@ -141,15 +141,14 @@
                 <button id="btn-connect-remote" class="btn-primary" style="margin-top: 0.5rem;" onclick="
                   const codeInput = document.getElementById('input-session-code');
                   const code = codeInput ? codeInput.value.trim() : '';
+                  const passGroup = document.getElementById('passcode-input-group');
+                  const passInput = document.getElementById('input-passcode');
                   if (!code) {
                     alert('กรุณากรอก Session ID 9 หลักก่อนนะคะ');
+                  } else if (passGroup && passGroup.classList.contains('hidden')) {
+                    passGroup.classList.remove('hidden');
+                    if (passInput) passInput.focus();
                   } else {
-                    const passGroup = document.getElementById('passcode-input-group');
-                    if (passGroup && passGroup.classList.contains('hidden')) {
-                      passGroup.classList.remove('hidden');
-                      const passInput = document.getElementById('input-passcode');
-                      if (passInput) passInput.focus();
-                    }
                     if (window.submitConnectRemote) window.submitConnectRemote();
                   }
                 ">

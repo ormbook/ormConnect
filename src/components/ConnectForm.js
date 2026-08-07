@@ -93,41 +93,37 @@ export class ConnectForm {
         return;
       }
 
+      // If passcode group is hidden, reveal it first
       if (passcodeGroupEl && passcodeGroupEl.classList.contains('hidden')) {
-        // Step 1: Reveal passcode group instantly and request connect
-        this.targetSessionCode = code;
         passcodeGroupEl.classList.remove('hidden');
         if (inputPasscodeEl) inputPasscodeEl.focus();
-        socketService.emit('viewer:request-connect', { sessionCode: code });
-        if (this.assistant) this.assistant.speak(`พบ Session <b>${code}</b> แล้วค่ะ! กรุณากรอก Passcode 4 หลักแล้วกด Connect นะคะ`);
-      } else {
-        // Step 2: Submit passcode
-        const passcode = inputPasscodeEl ? inputPasscodeEl.value.trim() : '';
-        if (!passcode) {
-          if (this.assistant) this.assistant.notifyError('กรุณากรอก Passcode ด้วยนะคะ');
-          return;
-        }
-
-        // Show Instant Waiting Card & Loading Spinner
-        if (btnConnectEl) {
-          btnConnectEl.disabled = true;
-          btnConnectEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งคำขอไปยัง Host...';
-        }
-        if (statusBoxEl) {
-          statusBoxEl.classList.remove('hidden');
-          statusBoxEl.innerHTML = `
-            <i class="fa-solid fa-clock fa-spin" style="color: var(--primary-cyan); font-size: 1.6rem; margin-bottom: 0.5rem;"></i>
-            <div style="font-size: 1rem; font-weight: 700; color: #fff;">ส่งคำขอเชื่อมต่อสำเร็จแล้วค่ะ!</div>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.3rem;">กำลังรอให้ฝั่ง Host กดปุ่ม "อนุมัติ & เริ่มแชร์หน้าจอ"</p>
-          `;
-        }
-
-        socketService.emit('viewer:verify-passcode', {
-          sessionCode: this.targetSessionCode || code,
-          passcode
-        });
-        if (this.assistant) this.assistant.speak('กำลังส่งคำขอเชื่อมต่อ! รอฝั่ง Host กดปุ่มอนุมัตินะคะ...');
       }
+
+      const passcode = inputPasscodeEl ? inputPasscodeEl.value.trim() : '';
+      if (!passcode) {
+        if (this.assistant) this.assistant.notifyError('กรุณากรอก Passcode 4 หลักของปลายทางด้วยนะคะ');
+        return;
+      }
+
+      // Both Code & Passcode are present! Show Instant Waiting Card & Loading Spinner
+      if (btnConnectEl) {
+        btnConnectEl.disabled = true;
+        btnConnectEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งคำขอไปยัง Host...';
+      }
+      if (statusBoxEl) {
+        statusBoxEl.classList.remove('hidden');
+        statusBoxEl.innerHTML = `
+          <i class="fa-solid fa-clock fa-spin" style="color: var(--primary-cyan); font-size: 1.6rem; margin-bottom: 0.5rem;"></i>
+          <div style="font-size: 1rem; font-weight: 700; color: #fff;">ส่งคำขอเชื่อมต่อสำเร็จแล้วค่ะ!</div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.3rem;">กำลังรอให้ฝั่ง Host กดปุ่ม "อนุมัติ & เริ่มแชร์หน้าจอ"</p>
+        `;
+      }
+
+      socketService.emit('viewer:verify-passcode', {
+        sessionCode: code,
+        passcode
+      });
+      if (this.assistant) this.assistant.speak('กำลังส่งคำขอเชื่อมต่อ! รอฝั่ง Host กดปุ่มอนุมัตินะคะ...');
     };
 
     if (btnConnect) {
