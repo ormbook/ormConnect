@@ -139,6 +139,19 @@ export class RemoteViewer {
         this.assistant.notifyError(message || 'การเชื่อมต่อถูกตัดแล้วค่ะ');
       }
     });
+  }
+
+  bindEvents() {
+    const btnInput = document.getElementById('tool-btn-input');
+    const btnFullscreen = document.getElementById('tool-btn-fullscreen');
+    const btnDisconnect = document.getElementById('tool-btn-disconnect');
+    const btnChat = document.getElementById('tool-btn-chat');
+    const btnFile = document.getElementById('tool-btn-file');
+    const btnCAD = document.getElementById('shortcut-ctrl-alt-del');
+    const btnTab = document.getElementById('shortcut-alt-tab');
+    const btnWin = document.getElementById('shortcut-win-key');
+    const screenWrap = document.getElementById('remote-screen-wrap');
+    const videoEl = document.getElementById('remote-video-stream');
 
     // Toggle Input Control
     btnInput.addEventListener('click', () => {
