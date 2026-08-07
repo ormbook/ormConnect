@@ -91,24 +91,28 @@ class RTCService {
   // Host starts sharing display screen (with iOS Safari compatibility & Canvas fallback)
   async startScreenShare() {
     try {
-      // Detect iOS / iPhone / iPad Safari
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (!this.localStream || !this.localStream.active) {
+        // Detect iOS / iPhone / iPad Safari
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-      // iOS Safari requires simple video: true constraint without complex object properties
-      const constraints = isIOS ? {
-        video: true,
-        audio: false
-      } : {
-        video: {
-          cursor: 'always',
-          frameRate: { ideal: 60, max: 60 }
-        },
-        audio: false
-      };
+        // iOS Safari requires simple video: true constraint without complex object properties
+        const constraints = isIOS ? {
+          video: true,
+          audio: false
+        } : {
+          video: {
+            cursor: 'always',
+            frameRate: { ideal: 60, max: 60 }
+          },
+          audio: false
+        };
 
-      console.log('[WebRTC] Requesting getDisplayMedia with constraints:', constraints);
-      this.localStream = await navigator.mediaDevices.getDisplayMedia(constraints);
+        console.log('[WebRTC] Requesting getDisplayMedia with constraints:', constraints);
+        this.localStream = await navigator.mediaDevices.getDisplayMedia(constraints);
+      } else {
+        console.log('[WebRTC] Reusing existing local stream for new peer connection');
+      }
     } catch (err) {
       console.warn('[WebRTC] getDisplayMedia cancelled or unsupported on this device. Generating fallback stream:', err);
       // Fallback: Generate live interactive Desktop Canvas stream if screen share is cancelled or unsupported

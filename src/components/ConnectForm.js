@@ -16,11 +16,9 @@ export class ConnectForm {
       try {
         const { sessionCode } = JSON.parse(savedViewer);
         this.targetSessionCode = sessionCode;
-        setTimeout(() => {
-          if (socketService.socket && socketService.socket.connected) {
-            socketService.emit('viewer:recover-session', { sessionCode });
-          }
-        }, 0);
+        
+        // Let socket.io buffer the emit if it's still connecting
+        socketService.emit('viewer:recover-session', { sessionCode });
       } catch (err) {}
     }
   }

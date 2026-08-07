@@ -155,6 +155,8 @@ io.on('connection', (socket) => {
         sessionCode,
         permissions: session.permissions
       });
+      // Notify Host to re-initialize and send new WebRTC offer
+      io.to(session.hostSocketId).emit('host:viewer-recovered');
     }
   });
 

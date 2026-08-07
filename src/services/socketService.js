@@ -56,7 +56,9 @@ class SocketService {
       'file:transfer-accept',
       'file:transfer-decline',
       'viewer:connect-declined',
-      'session:ended'
+      'session:ended',
+      'host:viewer-recovered',
+      'host:session-recovered'
     ];
 
     events.forEach(eventName => {

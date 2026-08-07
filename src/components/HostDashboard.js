@@ -303,6 +303,15 @@ export class HostDashboard {
       });
     });
 
+    socketService.on('host:viewer-recovered', () => {
+      document.getElementById('display-host-status').innerText = 'ผู้เชื่อมต่อกลับมาแล้ว (Active)';
+      document.getElementById('display-host-status').style.color = 'var(--accent-emerald)';
+      this.assistant.speak('ผู้เชื่อมต่อกลับมาแล้วค่ะ กำลังส่งสัญญาณภาพต่อ...');
+      
+      rtcService.initWebRTC(this.sessionCode, true);
+      rtcService.startScreenShare();
+    });
+
     // --- Simulated Interactive Cursor Overlay ---
     let fakeCursor = document.getElementById('fake-viewer-cursor');
     if (!fakeCursor) {
