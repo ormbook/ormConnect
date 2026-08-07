@@ -16,7 +16,13 @@ const io = new Server(httpServer, {
   }
 });
 
-// Serve static assets in production
+// Serve static assets in production (No-Cache for instant live updates)
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Active Sessions Store
