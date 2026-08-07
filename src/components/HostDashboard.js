@@ -231,6 +231,56 @@ export class HostDashboard {
   }
 
   // ──────────────────────────────────────────────────────
+  // Resume or Prompt Share
+  // If stream still active → reuse automatically (no user gesture needed)
+  // If stream gone (host refreshed) → show button for user to click
+  // ──────────────────────────────────────────────────────
+  async _resumeOrPromptShare(assistantMsg) {
+    const streamActive = rtcService.localStream && rtcService.localStream.active;
+
+    if (streamActive) {
+      // Stream still alive — can share automatically without user gesture
+      this._setStatus('กำลังส่งสัญญาณภาพ (Active)', 'var(--accent-emerald)');
+      this.assistant.speak('ผู้เชื่อมต่อกลับมาแล้วค่ะ กำลังส่งสัญญาณภาพต่อ...');
+      try {
+        await rtcService.startScreenShare();
+      } catch (err) {
+        console.warn('[HostDashboard] Auto-resume failed, prompting user:', err);
+        this._showSharePrompt(assistantMsg);
+      }
+    } else {
+      // Stream gone — must prompt user to click (browser security requirement)
+      this._showSharePrompt(assistantMsg);
+    }
+  }
+
+  _showSharePrompt(assistantMsg) {
+    this._setStatus('กรุณากด "เริ่มแชร์หน้าจอ" เพื่อส่งภาพให้ผู้เชื่อมต่อ', 'var(--accent-amber)');
+
+    // Show a prominent alert to Host
+    const alertBox = document.getElementById('host-incoming-alert');
+    if (alertBox) {
+      alertBox.innerHTML = `
+        <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-amber); margin-bottom: 0.4rem;">
+          <i class="fa-solid fa-display"></i> ผู้เชื่อมต่อรอรับหน้าจออยู่ค่ะ!
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">${assistantMsg}</p>
+        <button id="btn-accept-connection" class="btn-primary" style="width: auto; padding: 0.65rem 1.5rem; background: linear-gradient(135deg, #10b981, #059669); font-size: 1rem;">
+          <i class="fa-solid fa-display"></i> เริ่มแชร์หน้าจอ (Share Screen)
+        </button>
+      `;
+      alertBox.classList.remove('hidden');
+
+      // Re-bind accept button (because innerHTML replaced it)
+      document.getElementById('btn-accept-connection')?.addEventListener('click', () => {
+        if (this._handleStartShare) this._handleStartShare();
+      });
+    }
+
+    this.assistant.speak(assistantMsg);
+  }
+
+  // ──────────────────────────────────────────────────────
   // Socket Event Listeners (registered once in constructor)
   // ──────────────────────────────────────────────────────
   _registerSocketEvents() {
@@ -254,15 +304,16 @@ export class HostDashboard {
       this.passcode = passcode;
       this.isHosting = true;
 
-      const statusText = hasViewer ? 'กำลังถูกควบคุม (Active)' : 'รอเพื่อนเชื่อมต่อ...';
-      const statusColor = hasViewer ? 'var(--accent-emerald)' : 'var(--accent-amber)';
-      this._showActivePanel(sessionCode, passcode, statusText);
-      this._setStatus(statusText, statusColor);
+      this._showActivePanel(sessionCode, passcode, 'กู้คืน Session สำเร็จค่ะ');
       this.assistant.speak('กู้คืน Session สำเร็จค่ะ');
 
       rtcService.initWebRTC(sessionCode, true);
+
       if (hasViewer) {
-        rtcService.startScreenShare();
+        // Try to reuse existing stream (if Host didn't refresh)
+        this._resumeOrPromptShare('ผู้เชื่อมต่อยังอยู่ใน Session กรุณากด เริ่มแชร์หน้าจอ อีกครั้งค่ะ');
+      } else {
+        this._setStatus('รอเพื่อนเชื่อมต่อ...', 'var(--accent-amber)');
       }
     });
 
@@ -297,10 +348,10 @@ export class HostDashboard {
 
     // Viewer recovered after their refresh
     socketService.on('host:viewer-recovered', () => {
-      this._setStatus('ผู้เชื่อมต่อกลับมาแล้ว (Active)', 'var(--accent-emerald)');
-      this.assistant.speak('ผู้เชื่อมต่อกลับมาแล้วค่ะ กำลังส่งสัญญาณภาพใหม่...');
+      this._setStatus('ผู้เชื่อมต่อกลับมาแล้ว!', 'var(--accent-emerald)');
       rtcService.initWebRTC(this.sessionCode, true);
-      rtcService.startScreenShare();
+      // Try to reuse existing stream automatically; if gone, prompt Host to click
+      this._resumeOrPromptShare('ผู้เชื่อมต่อกลับมาแล้วค่ะ กรุณากดปุ่มเพื่อส่งสัญญาณภาพให้เขาด้วยนะคะ');
     });
 
     // Viewer disconnected
