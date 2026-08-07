@@ -159,6 +159,36 @@ io.on('connection', (socket) => {
     }
   });
 
+  // WebRTC Signaling (Peer-to-Peer)
+  socket.on('rtc:offer', ({ sessionCode, offer }) => {
+    socket.to(sessionCode).emit('rtc:offer', { offer });
+  });
+
+  socket.on('rtc:answer', ({ sessionCode, answer }) => {
+    socket.to(sessionCode).emit('rtc:answer', { answer });
+  });
+
+  socket.on('rtc:candidate', ({ sessionCode, candidate }) => {
+    socket.to(sessionCode).emit('rtc:candidate', { candidate });
+  });
+
+  // Chat & File Transfer Signaling
+  socket.on('chat:message', (data) => {
+    socket.to(data.sessionCode).emit('chat:message', data);
+  });
+
+  socket.on('file:transfer-request', (data) => {
+    socket.to(data.sessionCode).emit('file:transfer-request', data);
+  });
+
+  socket.on('file:transfer-accept', (data) => {
+    socket.to(data.sessionCode).emit('file:transfer-accept', data);
+  });
+
+  socket.on('file:transfer-decline', (data) => {
+    socket.to(data.sessionCode).emit('file:transfer-decline', data);
+  });
+
   // Disconnect session explicitly
   socket.on('session:disconnect', ({ sessionCode }) => {
     console.log(`[Session] User requested disconnect for ${sessionCode}`);
