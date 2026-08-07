@@ -80,55 +80,57 @@ export class ConnectForm {
     });
 
     window.submitConnectRemote = () => {
-      console.log('[ConnectForm] submitConnectRemote triggered!');
-      const inputCodeEl = document.getElementById('input-session-code');
-      const inputPasscodeEl = document.getElementById('input-passcode');
-      const passcodeGroupEl = document.getElementById('passcode-input-group');
-      const statusBoxEl = document.getElementById('viewer-status-card');
-      const btnConnectEl = document.getElementById('btn-connect-remote');
+      try {
+        console.log('[ConnectForm] submitConnectRemote triggered!');
+        const inputCodeEl = document.getElementById('input-session-code');
+        const inputPasscodeEl = document.getElementById('input-passcode');
+        const passcodeGroupEl = document.getElementById('passcode-input-group');
+        const statusBoxEl = document.getElementById('viewer-status-card');
+        const btnConnectEl = document.getElementById('btn-connect-remote');
 
-      const code = inputCodeEl ? inputCodeEl.value.trim() : '';
-      if (!code) {
-        if (this.assistant) this.assistant.notifyError('กรุณากรอก Session ID 9 หลักก่อนนะคะ');
-        return;
-      }
+        const code = inputCodeEl ? inputCodeEl.value.trim() : '';
+        if (!code) {
+          if (this.assistant) this.assistant.notifyError('กรุณากรอก Session ID 9 หลักก่อนนะคะ');
+          return;
+        }
 
-      // If passcode group is hidden, reveal it first
-      if (passcodeGroupEl && passcodeGroupEl.classList.contains('hidden')) {
-        passcodeGroupEl.classList.remove('hidden');
-        if (inputPasscodeEl) inputPasscodeEl.focus();
-      }
+        // If passcode group is hidden, reveal it first and STOP execution
+        if (passcodeGroupEl && passcodeGroupEl.classList.contains('hidden')) {
+          passcodeGroupEl.classList.remove('hidden');
+          if (inputPasscodeEl) inputPasscodeEl.focus();
+          return; // <--- CRITICAL FIX: Stop execution so it doesn't immediately check for empty passcode!
+        }
 
-      const passcode = inputPasscodeEl ? inputPasscodeEl.value.trim() : '';
-      if (!passcode) {
-        if (this.assistant) this.assistant.notifyError('กรุณากรอก Passcode 4 หลักของปลายทางด้วยนะคะ');
-        return;
-      }
+        const passcode = inputPasscodeEl ? inputPasscodeEl.value.trim() : '';
+        if (!passcode) {
+          if (this.assistant) this.assistant.notifyError('กรุณากรอก Passcode 4 หลักของปลายทางด้วยนะคะ');
+          return;
+        }
 
-      // Both Code & Passcode are present! Show Instant Waiting Card & Loading Spinner
-      if (btnConnectEl) {
-        btnConnectEl.disabled = true;
-        btnConnectEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งคำขอไปยัง Host...';
-      }
-      if (statusBoxEl) {
-        statusBoxEl.classList.remove('hidden');
-        statusBoxEl.innerHTML = `
-          <i class="fa-solid fa-clock fa-spin" style="color: var(--primary-cyan); font-size: 1.6rem; margin-bottom: 0.5rem;"></i>
-          <div style="font-size: 1rem; font-weight: 700; color: #fff;">ส่งคำขอเชื่อมต่อสำเร็จแล้วค่ะ!</div>
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.3rem;">กำลังรอให้ฝั่ง Host กดปุ่ม "อนุมัติ & เริ่มแชร์หน้าจอ"</p>
-        `;
-      }
+        // Both Code & Passcode are present! Show Instant Waiting Card & Loading Spinner
+        if (btnConnectEl) {
+          btnConnectEl.disabled = true;
+          btnConnectEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งคำขอไปยัง Host...';
+        }
+        if (statusBoxEl) {
+          statusBoxEl.classList.remove('hidden');
+          statusBoxEl.innerHTML = `
+            <i class="fa-solid fa-clock fa-spin" style="color: var(--primary-cyan); font-size: 1.6rem; margin-bottom: 0.5rem;"></i>
+            <div style="font-size: 1rem; font-weight: 700; color: #fff;">ส่งคำขอเชื่อมต่อสำเร็จแล้วค่ะ!</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.3rem;">กำลังรอให้ฝั่ง Host กดปุ่ม "อนุมัติ & เริ่มแชร์หน้าจอ"</p>
+          `;
+        }
 
-      socketService.emit('viewer:verify-passcode', {
-        sessionCode: code,
-        passcode
-      });
-      if (this.assistant) this.assistant.speak('กำลังส่งคำขอเชื่อมต่อ! รอฝั่ง Host กดปุ่มอนุมัตินะคะ...');
+        socketService.emit('viewer:verify-passcode', {
+          sessionCode: code,
+          passcode
+        });
+        if (this.assistant) this.assistant.speak('กำลังส่งคำขอเชื่อมต่อ! รอฝั่ง Host กดปุ่มอนุมัตินะคะ...');
+      } catch (err) {
+        console.error('[ConnectForm] submitConnectRemote error:', err);
+      }
     };
-
-    if (btnConnect) {
-      btnConnect.addEventListener('click', window.submitConnectRemote);
-    }
+    // Removed addEventListener to prevent double execution since inline onclick is used.
 
     // Socket Response Events
     socketService.on('viewer:require-passcode', () => {
