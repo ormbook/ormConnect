@@ -133,6 +133,19 @@ export class RemoteViewer {
       }
     });
 
+    // Listen for decline or disconnect events from socket
+    socketService.on('viewer:connection-declined', ({ message }) => {
+      this.closeSession();
+      this.assistant.speak(message || 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ');
+    });
+
+    socketService.on('session:ended', ({ message }) => {
+      if (!this.overlay.classList.contains('hidden')) {
+        this.closeSession();
+        this.assistant.speak(message || 'การเชื่อมต่อถูกตัดแล้วค่ะ');
+      }
+    });
+
     this.assistant.speak('กำลังรอสัญญาณสตรีมหน้าจอจากเครื่องปลายทางค่ะ! หากปลายทางเป็นเครื่องทดสอบ สามารถกดเปิดโหมดจำลอง OS ได้เลยนะคะ');
   }
 

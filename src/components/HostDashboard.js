@@ -123,7 +123,11 @@ export class HostDashboard {
     if (btnDecline) {
       btnDecline.addEventListener('click', () => {
         if (alertBox) alertBox.classList.add('hidden');
-        this.stopHosting();
+        if (this.sessionCode) {
+          socketService.emit('host:decline-connection', { sessionCode: this.sessionCode });
+        }
+        document.getElementById('display-host-status').innerText = 'ปฏิเสธคำขอแล้ว';
+        document.getElementById('display-host-status').style.color = 'var(--accent-rose)';
         this.assistant.speak('ปฏิเสธคำขอเชื่อมต่อเรียบร้อยแล้วค่ะ');
       });
     }

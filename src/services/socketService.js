@@ -53,6 +53,7 @@ class SocketService {
       'file:transfer-request',
       'file:transfer-accept',
       'file:transfer-decline',
+      'viewer:connection-declined',
       'session:ended'
     ];
 

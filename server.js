@@ -157,6 +157,14 @@ io.on('connection', (socket) => {
     socket.to(sessionCode).emit('file:transfer-decline');
   });
 
+  // Host declines connection request
+  socket.on('host:decline-connection', ({ sessionCode }) => {
+    console.log(`[Host] Declined connection for session ${sessionCode}`);
+    socket.to(sessionCode).emit('viewer:connection-declined', {
+      message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
+    });
+  });
+
   // Disconnect session explicitly
   socket.on('session:disconnect', ({ sessionCode }) => {
     console.log(`[Session] User requested disconnect for ${sessionCode}`);
