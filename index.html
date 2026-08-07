@@ -67,7 +67,18 @@
                   </select>
                 </div>
 
-                <button id="btn-start-hosting" class="btn-primary" onclick="window.startHostSession && window.startHostSession()">
+                <button id="btn-start-hosting" class="btn-primary" onclick="
+                  const p1 = Math.floor(100 + Math.random() * 900);
+                  const p2 = Math.floor(100 + Math.random() * 900);
+                  const p3 = Math.floor(100 + Math.random() * 900);
+                  const code = p1 + '-' + p2 + '-' + p3;
+                  const pass = Math.floor(1000 + Math.random() * 9000).toString();
+                  document.getElementById('display-session-code').innerText = code;
+                  document.getElementById('display-passcode').innerText = pass;
+                  document.getElementById('host-start-panel').classList.add('hidden');
+                  document.getElementById('host-active-panel').classList.remove('hidden');
+                  if (window.startHostSession) window.startHostSession(code, pass);
+                ">
                   <i class="fa-solid fa-play"></i> เริ่มสร้าง Session แชร์หน้าจอ
                 </button>
               </div>

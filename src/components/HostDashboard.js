@@ -138,14 +138,19 @@ export class HostDashboard {
       });
     }
 
-    window.startHostSession = () => {
-      console.log('[HostDashboard] startHostSession triggered!');
-      // Generate Instant Local Session Code & Passcode
-      const p1 = Math.floor(100 + Math.random() * 900);
-      const p2 = Math.floor(100 + Math.random() * 900);
-      const p3 = Math.floor(100 + Math.random() * 900);
-      const sessionCode = `${p1}-${p2}-${p3}`;
-      const passcode = Math.floor(1000 + Math.random() * 9000).toString();
+    window.startHostSession = (presetCode, presetPass) => {
+      console.log('[HostDashboard] startHostSession triggered!', { presetCode, presetPass });
+
+      let sessionCode = presetCode;
+      let passcode = presetPass;
+
+      if (!sessionCode || !passcode) {
+        const p1 = Math.floor(100 + Math.random() * 900);
+        const p2 = Math.floor(100 + Math.random() * 900);
+        const p3 = Math.floor(100 + Math.random() * 900);
+        sessionCode = `${p1}-${p2}-${p3}`;
+        passcode = Math.floor(1000 + Math.random() * 9000).toString();
+      }
 
       this.sessionCode = sessionCode;
       this.passcode = passcode;
