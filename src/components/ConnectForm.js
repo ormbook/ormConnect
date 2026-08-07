@@ -130,8 +130,9 @@ export class ConnectForm {
         console.error('[ConnectForm] submitConnectRemote error:', err);
       }
     };
-    // Removed addEventListener to prevent double execution since inline onclick is used.
-
+    if (btnConnect) {
+      btnConnect.addEventListener('click', window.submitConnectRemote);
+    }
     // Socket Response Events
     socketService.on('viewer:require-passcode', () => {
       if (passcodeGroup) passcodeGroup.classList.remove('hidden');
