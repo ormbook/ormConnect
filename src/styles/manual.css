@@ -1,0 +1,141 @@
+/* ==========================================================================
+   Web Manual & Video Walkthrough Styles
+   ========================================================================== */
+
+.manual-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.manual-hero-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #fff, var(--primary-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+}
+
+.manual-hero-desc {
+  font-size: 1rem;
+  color: var(--text-muted);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.manual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.75rem;
+  margin-bottom: 3rem;
+}
+
+.manual-card {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.manual-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(0, 240, 255, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 240, 255, 0.1);
+}
+
+.manual-img-wrap {
+  position: relative;
+  width: 100%;
+  height: 190px;
+  overflow: hidden;
+  background: #090d16;
+}
+
+.manual-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.manual-card:hover .manual-img {
+  transform: scale(1.05);
+}
+
+.manual-step-badge {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: linear-gradient(135deg, var(--primary-cyan), var(--primary-blue));
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0, 240, 255, 0.4);
+}
+
+.manual-card-body {
+  padding: 1.5rem;
+}
+
+.manual-card-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-main);
+}
+
+.manual-card-text {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.nong-orm-tip {
+  background: rgba(0, 240, 255, 0.06);
+  border-left: 3px solid var(--primary-cyan);
+  padding: 0.6rem 0.9rem;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: #e2e8f0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.nong-orm-tip i {
+  color: var(--primary-cyan);
+  margin-top: 2px;
+}
+
+/* Video Section */
+.manual-video-section {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  text-align: center;
+}
+
+.video-container {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  margin: 1.5rem auto 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-active);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  background: #000;
+}
+
+.demo-interactive-canvas {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: block;
+}

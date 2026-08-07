@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ormConnect - Remote Desktop & AI Secretary Nong Orm</title>
+  <meta name="description" content="ormConnect - แอปพลิเคชันควบคุมคอมพิวเตอร์ระยะไกลแบบเรียลไทม์ผ่านเว็บ พร้อมผู้ช่วยส่วนตัว น้องออม">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/src/styles/main.css">
+  <link rel="stylesheet" href="/src/styles/remote-desktop.css">
+  <link rel="stylesheet" href="/src/styles/manual.css">
+</head>
+<body class="dark-theme">
+  <div id="app">
+    <!-- Header Navigation -->
+    <header class="app-header">
+      <div class="logo-container">
+        <div class="logo-icon">
+          <i class="fa-solid fa-desktop"></i>
+          <span class="logo-pulse"></span>
+        </div>
+        <div class="logo-text">
+          <span class="brand-name">orm<span class="brand-accent">Connect</span></span>
+          <span class="brand-tagline">Remote Desktop & AI Secretary</span>
+        </div>
+      </div>
+
+      <nav class="app-nav">
+        <button id="nav-connect" class="nav-btn active">
+          <i class="fa-solid fa-network-wired"></i> รีโมทควบคุม
+        </button>
+        <button id="nav-simulator" class="nav-btn">
+          <i class="fa-solid fa-gamepad"></i> โหมดจำลอง OS (Simulator)
+        </button>
+        <button id="nav-manual" class="nav-btn">
+          <i class="fa-solid fa-book-open"></i> คู่มือการใช้งาน (Manual)
+        </button>
+      </nav>
+
+      <div class="header-status">
+        <span class="status-indicator online"></span>
+        <span id="socket-status-text">พร้อมใช้งาน (Online)</span>
+      </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="app-container">
+      <!-- Section 1: Main Connect Dashboard (Host + Connect Form) -->
+      <section id="section-connect" class="content-section active">
+        <div class="grid-2-col">
+          <!-- Left Column: Host My PC -->
+          <div id="host-dashboard-container"></div>
+          <!-- Right Column: Connect Remote PC -->
+          <div id="connect-form-container"></div>
+        </div>
+      </section>
+
+      <!-- Section 2: Virtual Desktop OS Simulator -->
+      <section id="section-simulator" class="content-section">
+        <div id="virtual-desktop-container"></div>
+      </section>
+
+      <!-- Section 3: Web Manual & Video Walkthrough -->
+      <section id="section-manual" class="content-section">
+        <div id="manual-container"></div>
+      </section>
+    </main>
+
+    <!-- Floating AI Assistant Badge & Dialogue (Nong Orm) -->
+    <div id="nong-orm-widget-container"></div>
+
+    <!-- Fullscreen Remote Desktop Viewer Overlay -->
+    <div id="remote-viewer-overlay" class="hidden"></div>
+
+    <!-- Chat & File Transfer Modals -->
+    <div id="chat-drawer-container"></div>
+    <div id="file-transfer-modal-container"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
