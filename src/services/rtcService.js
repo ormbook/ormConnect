@@ -8,6 +8,7 @@ class RTCService {
     this.dataChannel = null;
     this.sessionCode = null;
     this.isHost = false;
+    this._signalListenersAttached = false;
 
     this.listeners = new Map();
 
@@ -22,6 +23,14 @@ class RTCService {
   }
 
   initWebRTC(sessionCode, isHost) {
+    // Close any existing peer connection first (clean slate)
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      this.peerConnection = null;
+      this.dataChannel = null;
+      this.remoteStream = null;
+    }
+
     this.sessionCode = sessionCode;
     this.isHost = isHost;
 
@@ -44,7 +53,7 @@ class RTCService {
       this.trigger('remote-stream', this.remoteStream);
     };
 
-    // If Host, create DataChannel for receiving input events
+    // If Host, create DataChannel for input events
     if (this.isHost) {
       this.dataChannel = this.peerConnection.createDataChannel('inputChannel');
       this.setupDataChannel(this.dataChannel);
@@ -56,29 +65,46 @@ class RTCService {
       };
     }
 
-    // Setup Socket Signaling Listeners
+    // Attach socket signaling listeners ONCE
+    if (!this._signalListenersAttached) {
+      this._signalListenersAttached = true;
+      this._attachSignalListeners();
+    }
+
+    console.log(`[WebRTC] Initialized as ${isHost ? 'HOST' : 'VIEWER'} for session ${sessionCode}`);
+  }
+
+  _attachSignalListeners() {
     socketService.on('rtc:offer', async ({ offer }) => {
       if (!this.isHost && this.peerConnection) {
         console.log('[WebRTC] Received offer, creating answer...');
-        await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await this.peerConnection.createAnswer();
-        await this.peerConnection.setLocalDescription(answer);
-        socketService.emit('rtc:answer', {
-          sessionCode: this.sessionCode,
-          answer
-        });
+        try {
+          await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await this.peerConnection.createAnswer();
+          await this.peerConnection.setLocalDescription(answer);
+          socketService.emit('rtc:answer', {
+            sessionCode: this.sessionCode,
+            answer
+          });
+        } catch (err) {
+          console.error('[WebRTC] Error processing offer:', err);
+        }
       }
     });
 
     socketService.on('rtc:answer', async ({ answer }) => {
       if (this.isHost && this.peerConnection) {
         console.log('[WebRTC] Received answer, setting remote description...');
-        await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        try {
+          await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        } catch (err) {
+          console.error('[WebRTC] Error setting answer:', err);
+        }
       }
     });
 
     socketService.on('rtc:candidate', async ({ candidate }) => {
-      if (this.peerConnection) {
+      if (this.peerConnection && this.peerConnection.remoteDescription) {
         try {
           await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
         } catch (err) {
@@ -88,7 +114,7 @@ class RTCService {
     });
   }
 
-  // Host starts sharing display screen (with iOS Safari compatibility & Canvas fallback)
+  // Host starts sharing display screen (with fallback canvas stream)
   async startScreenShare() {
     try {
       if (!this.localStream || !this.localStream.active) {
@@ -96,49 +122,59 @@ class RTCService {
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-        // iOS Safari requires simple video: true constraint without complex object properties
         const constraints = isIOS ? {
           video: true,
           audio: false
         } : {
           video: {
             cursor: 'always',
-            frameRate: { ideal: 60, max: 60 }
+            frameRate: { ideal: 30, max: 60 }
           },
           audio: false
         };
 
-        console.log('[WebRTC] Requesting getDisplayMedia with constraints:', constraints);
+        console.log('[WebRTC] Requesting getDisplayMedia...');
         this.localStream = await navigator.mediaDevices.getDisplayMedia(constraints);
+
+        // Auto-stop sharing when user stops via browser UI
+        this.localStream.getTracks().forEach(track => {
+          track.onended = () => {
+            console.log('[WebRTC] Screen share ended by user');
+            this.trigger('screen-share-ended');
+          };
+        });
       } else {
         console.log('[WebRTC] Reusing existing local stream for new peer connection');
       }
     } catch (err) {
-      console.warn('[WebRTC] getDisplayMedia cancelled or unsupported on this device. Generating fallback stream:', err);
-      // Fallback: Generate live interactive Desktop Canvas stream if screen share is cancelled or unsupported
+      console.warn('[WebRTC] getDisplayMedia cancelled or unsupported. Generating fallback stream:', err);
       this.localStream = this.createFallbackCanvasStream();
     }
 
-    // Add tracks to PeerConnection
+    // Add tracks to new PeerConnection
     if (this.peerConnection && this.localStream) {
       this.localStream.getTracks().forEach(track => {
         this.peerConnection.addTrack(track, this.localStream);
       });
 
       // Create and send offer to Viewer
-      const offer = await this.peerConnection.createOffer();
-      await this.peerConnection.setLocalDescription(offer);
-
-      socketService.emit('rtc:offer', {
-        sessionCode: this.sessionCode,
-        offer
-      });
+      try {
+        const offer = await this.peerConnection.createOffer();
+        await this.peerConnection.setLocalDescription(offer);
+        socketService.emit('rtc:offer', {
+          sessionCode: this.sessionCode,
+          offer
+        });
+        console.log('[WebRTC] Offer sent to viewer');
+      } catch (err) {
+        console.error('[WebRTC] Error creating offer:', err);
+      }
     }
 
     return this.localStream;
   }
 
-  // Generates a live 60 FPS animated desktop canvas stream when screen share is cancelled or in single-browser demo mode
+  // Generates an interactive fallback canvas stream (60 FPS) 
   createFallbackCanvasStream() {
     const canvas = document.createElement('canvas');
     canvas.width = 1280;
@@ -150,6 +186,7 @@ class RTCService {
     let mouseY = canvas.height / 2;
     let isMouseDown = false;
     let lastKey = '';
+    let lastKeyTimer = null;
 
     // Listen to input events to make the simulation interactive
     this.on('input-event', (data) => {
@@ -162,80 +199,117 @@ class RTCService {
         isMouseDown = false;
       } else if (data.type === 'keydown') {
         lastKey = data.payload.key;
+        clearTimeout(lastKeyTimer);
+        lastKeyTimer = setTimeout(() => { lastKey = ''; }, 2000);
       } else if (data.type === 'shortcut') {
         lastKey = data.payload.combo;
+        clearTimeout(lastKeyTimer);
+        lastKeyTimer = setTimeout(() => { lastKey = ''; }, 2000);
       }
     });
 
     const draw = () => {
-      if (!this.localStream) return; // stop loop if stream closed
+      if (!this.localStream || !this.localStream.active) return;
       frame++;
-      ctx.fillStyle = '#0b0f19';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Desktop Wallpaper Gradient
+      // Background
       const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
       grad.addColorStop(0, '#0f172a');
       grad.addColorStop(1, '#070a12');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Brand Logo & Status
-      ctx.fillStyle = 'rgba(0, 240, 255, 0.12)';
-      ctx.font = '700 42px Outfit, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('ormConnect Remote Stream (Active)', canvas.width / 2, canvas.height / 2 - 40);
-
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = '16px monospace';
-      ctx.fillText(`Session ID: ${this.sessionCode} | 60 FPS Stream | P2P Active`, canvas.width / 2, canvas.height / 2 + 10);
-
-      // App Window Preview
-      ctx.fillStyle = '#1e293b';
-      ctx.roundRect(160, 100, 480, 300, 10); ctx.fill();
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)'; ctx.stroke();
-
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(160, 100, 480, 36);
-      ctx.fillStyle = '#00f0ff';
-      ctx.font = '600 14px Outfit, sans-serif'; ctx.textAlign = 'left';
-      ctx.fillText('📝 Notepad - Host System Desktop', 180, 123);
-
-      ctx.fillStyle = '#4ade80';
-      ctx.font = '13px monospace';
-      ctx.fillText('Host desktop is streaming via WebRTC P2P.', 180, 160);
-      ctx.fillText('Interactive input channel is listening...', 180, 185);
-
-      if (lastKey) {
-        ctx.fillStyle = '#fde047';
-        ctx.fillText(`Key Pressed: ${lastKey}`, 180, 215);
+      // Grid lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 60) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 60) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
 
-      // Taskbar
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
-      ctx.fillRect(0, canvas.height - 48, canvas.width, 48);
+      // Header
+      ctx.fillStyle = 'rgba(0, 240, 255, 0.06)';
+      ctx.fillRect(0, 0, canvas.width, 56);
       ctx.fillStyle = '#00f0ff';
-      ctx.font = '700 14px Outfit, sans-serif';
+      ctx.font = '700 20px Outfit, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('ormConnect Remote Desktop — Simulation Mode', 24, 36);
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '13px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`Session: ${this.sessionCode}  |  Input: ${isMouseDown ? 'CLICK' : 'Move'}`, canvas.width - 24, 36);
+
+      // Notepad window
+      ctx.fillStyle = '#1e293b';
+      ctx.roundRect(60, 80, 520, 340, 10); ctx.fill();
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.25)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(60, 80, 520, 38);
+      ctx.fillStyle = '#00f0ff';
+      ctx.font = '600 13px Outfit, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('📝 Notepad — RemoteText.txt', 80, 104);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(68, 126, 504, 286);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '14px monospace';
+      ctx.fillText('ormConnect P2P DataChannel Active', 80, 158);
+      ctx.fillStyle = '#4ade80';
+      ctx.fillText('Mouse & Keyboard events are received in real-time.', 80, 182);
+      if (lastKey) {
+        ctx.fillStyle = '#fde047';
+        ctx.fillText(`Key Pressed: [${lastKey}]`, 80, 210);
+      }
+
+      // Terminal window
+      ctx.fillStyle = '#090d16';
+      ctx.roundRect(620, 100, 600, 300, 10); ctx.fill();
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.3)'; ctx.stroke();
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(620, 100, 600, 38);
+      ctx.fillStyle = '#10b981';
+      ctx.font = '600 13px Outfit, sans-serif';
+      ctx.fillText(`💻 Terminal — Remote Session ${this.sessionCode}`, 640, 124);
+      ctx.fillStyle = '#4ade80';
+      ctx.font = '13px monospace';
+      ctx.fillText('C:\\ormConnect> agent status', 640, 166);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText('[OK] DataChannel Latency: <10ms', 640, 190);
+      ctx.fillText('[OK] WebRTC P2P Stream: 60 FPS Active', 640, 214);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`C:\\ormConnect> ${(frame % 60 < 30) ? '_' : ''}`, 640, 252);
+
+      // Taskbar
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.97)';
+      ctx.fillRect(0, canvas.height - 48, canvas.width, 48);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.beginPath(); ctx.moveTo(0, canvas.height - 48); ctx.lineTo(canvas.width, canvas.height - 48); ctx.stroke();
+      ctx.fillStyle = '#00f0ff';
+      ctx.font = '700 14px Outfit, sans-serif'; ctx.textAlign = 'left';
       ctx.fillText('❖ Start', 20, canvas.height - 18);
+      ctx.fillStyle = '#64748b';
+      const now = new Date();
+      ctx.fillText(`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} — ormConnect`, canvas.width - 280, canvas.height - 18);
 
       // Interactive Cursor
-      ctx.fillStyle = isMouseDown ? 'rgba(255, 50, 50, 0.9)' : '#00f0ff';
+      ctx.fillStyle = isMouseDown ? 'rgba(0, 240, 255, 0.95)' : 'rgba(255, 50, 50, 0.85)';
       ctx.beginPath(); ctx.arc(mouseX, mouseY, isMouseDown ? 10 : 7, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = isMouseDown ? 'rgba(255, 50, 50, 0.5)' : 'rgba(0, 240, 255, 0.5)';
-      ctx.beginPath(); ctx.arc(mouseX, mouseY, 12 + (frame % 15), 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = isMouseDown ? 'rgba(0, 240, 255, 0.4)' : 'rgba(255, 50, 50, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(mouseX, mouseY, 16 + (frame % 20), 0, Math.PI * 2); ctx.stroke();
 
       requestAnimationFrame(draw);
     };
 
     draw();
 
-    // Capture 60 FPS stream from canvas
     return canvas.captureStream(60);
   }
 
   setupDataChannel(channel) {
     channel.onopen = () => {
-      console.log('[WebRTC DataChannel] Channel OPEN!');
+      console.log('[WebRTC DataChannel] Channel OPEN — input control ready!');
       this.trigger('channel-ready');
     };
 
@@ -247,12 +321,18 @@ class RTCService {
         console.warn('[DataChannel] Invalid JSON message:', event.data);
       }
     };
+
+    channel.onclose = () => {
+      console.log('[WebRTC DataChannel] Channel CLOSED');
+    };
   }
 
-  // Viewer sends Mouse/Keyboard input event to Host
+  // Viewer sends Mouse/Keyboard input event to Host via DataChannel
   sendInputEvent(type, payload) {
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       this.dataChannel.send(JSON.stringify({ type, payload }));
+    } else {
+      console.warn('[DataChannel] Cannot send — channel not open. State:', this.dataChannel?.readyState);
     }
   }
 
@@ -267,6 +347,7 @@ class RTCService {
     }
     this.remoteStream = null;
     this.dataChannel = null;
+    console.log('[WebRTC] Connection closed and cleaned up');
   }
 
   on(event, callback) {
@@ -274,6 +355,12 @@ class RTCService {
       this.listeners.set(event, []);
     }
     this.listeners.get(event).push(callback);
+  }
+
+  off(event, callback) {
+    if (!this.listeners.has(event)) return;
+    const list = this.listeners.get(event).filter(cb => cb !== callback);
+    this.listeners.set(event, list);
   }
 
   trigger(event, data) {

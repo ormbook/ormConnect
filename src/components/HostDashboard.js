@@ -8,41 +8,59 @@ export class HostDashboard {
     this.sessionCode = null;
     this.passcode = null;
     this.isHosting = false;
+    this._eventsRegistered = false;
 
     this.render();
+    this._registerSocketEvents();
+    this._tryRecoverSession();
+  }
 
-    // Session Recovery on Refresh
+  // ──────────────────────────────────────────────────────
+  // Session Recovery on Refresh
+  // ──────────────────────────────────────────────────────
+  _tryRecoverSession() {
     const savedSession = sessionStorage.getItem('orm_host_session');
-    if (savedSession) {
-      try {
-        const { sessionCode, passcode } = JSON.parse(savedSession);
-        this.sessionCode = sessionCode;
-        this.passcode = passcode;
-        this.isHosting = true;
-        // Wait a tick for DOM to be ready
-        setTimeout(() => this.recoverUIState(), 0);
-      } catch (err) {}
+    if (!savedSession) return;
+    try {
+      const { sessionCode, passcode } = JSON.parse(savedSession);
+      this.sessionCode = sessionCode;
+      this.passcode = passcode;
+      this.isHosting = true;
+      this._showActivePanel(sessionCode, passcode, 'กำลังกู้คืน Session...');
+      // Emit recovery — socket.io will buffer if not yet connected
+      socketService.emit('host:recover-session', { sessionCode, passcode });
+    } catch (err) {
+      sessionStorage.removeItem('orm_host_session');
     }
   }
 
-  recoverUIState() {
+  // ──────────────────────────────────────────────────────
+  // UI Helpers
+  // ──────────────────────────────────────────────────────
+  _showActivePanel(sessionCode, passcode, statusText = 'รอเพื่อนเชื่อมต่อ...') {
     const startPanel = document.getElementById('host-start-panel');
     const activePanel = document.getElementById('host-active-panel');
     if (startPanel) startPanel.classList.add('hidden');
     if (activePanel) activePanel.classList.remove('hidden');
-
     const dispCode = document.getElementById('display-session-code');
     const dispPass = document.getElementById('display-passcode');
-    if (dispCode) dispCode.innerText = this.sessionCode;
-    if (dispPass) dispPass.innerText = this.passcode;
-    document.getElementById('display-host-status').innerText = 'กำลังกู้คืน Session...';
-
-    // If socket is already connected, emit recovery
-    if (socketService.socket && socketService.socket.connected) {
-      socketService.emit('host:recover-session', { sessionCode: this.sessionCode, passcode: this.passcode });
+    const dispStatus = document.getElementById('display-host-status');
+    if (dispCode) dispCode.innerText = sessionCode;
+    if (dispPass) dispPass.innerText = passcode;
+    if (dispStatus) {
+      dispStatus.innerText = statusText;
+      dispStatus.style.color = 'var(--accent-amber)';
     }
   }
 
+  _setStatus(text, color = 'var(--accent-amber)') {
+    const el = document.getElementById('display-host-status');
+    if (el) { el.innerText = text; el.style.color = color; }
+  }
+
+  // ──────────────────────────────────────────────────────
+  // Render
+  // ──────────────────────────────────────────────────────
   render() {
     if (!document.getElementById('btn-start-hosting')) {
       this.container.innerHTML = `
@@ -89,12 +107,12 @@ export class HostDashboard {
             </div>
           </div>
 
-          <div style="display: flex; gap: 0.75rem;">
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
             <button id="btn-copy-code" class="btn-secondary">
               <i class="fa-solid fa-copy"></i> คัดลอกรหัส
             </button>
             <button id="btn-manual-share" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669);">
-              <i class="fa-solid fa-display"></i> เริ่มแชร์หน้าจอ (Share Screen)
+              <i class="fa-solid fa-display"></i> เริ่มแชร์หน้าจอ
             </button>
             <button id="btn-stop-hosting" class="btn-danger">
               <i class="fa-solid fa-stop"></i> ปิด Session
@@ -109,10 +127,9 @@ export class HostDashboard {
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
               มีผู้ใช้กำลังขอสิทธิ์เข้าควบคุมและรับภาพสตรีมหน้าจอของคุณ
             </p>
-
             <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
               <button id="btn-accept-connection" class="btn-primary" style="width: auto; padding: 0.65rem 1.5rem; background: linear-gradient(135deg, #10b981, #059669); font-size: 1rem;">
-                <i class="fa-solid fa-check"></i> อนุมัติ & เริ่มแชร์หน้าจอ (Accept & Share Screen)
+                <i class="fa-solid fa-check"></i> อนุมัติ & เริ่มแชร์หน้าจอ
               </button>
               <button id="btn-decline-connection" class="btn-danger" style="width: auto;">
                 <i class="fa-solid fa-xmark"></i> ปฏิเสธ (Decline)
@@ -121,28 +138,28 @@ export class HostDashboard {
           </div>
         </div>
       </div>
-    `;
+      `;
     }
 
-    this.bindEvents();
+    this._bindButtonEvents();
   }
 
-  bindEvents() {
+  // ──────────────────────────────────────────────────────
+  // Button Event Listeners (called once after render)
+  // ──────────────────────────────────────────────────────
+  _bindButtonEvents() {
     const btnStart = document.getElementById('btn-start-hosting');
     const btnStop = document.getElementById('btn-stop-hosting');
     const btnCopy = document.getElementById('btn-copy-code');
-    const permSelect = document.getElementById('host-permission-select');
-
     const btnManualShare = document.getElementById('btn-manual-share');
     const btnAccept = document.getElementById('btn-accept-connection');
     const btnDecline = document.getElementById('btn-decline-connection');
-    const alertBox = document.getElementById('host-incoming-alert');
 
     const handleStartShare = async () => {
+      const alertBox = document.getElementById('host-incoming-alert');
       try {
         if (alertBox) alertBox.classList.add('hidden');
-        document.getElementById('display-host-status').innerText = 'กำลังสตรีมหน้าจอ (Active)';
-        document.getElementById('display-host-status').style.color = 'var(--accent-emerald)';
+        this._setStatus('กำลังสตรีมหน้าจอ (Active)', 'var(--accent-emerald)');
 
         if (this.sessionCode) {
           socketService.emit('host:accept-connection', { sessionCode: this.sessionCode });
@@ -157,177 +174,172 @@ export class HostDashboard {
 
     if (btnManualShare) btnManualShare.addEventListener('click', handleStartShare);
     if (btnAccept) btnAccept.addEventListener('click', handleStartShare);
+
     if (btnDecline) {
       btnDecline.addEventListener('click', () => {
+        const alertBox = document.getElementById('host-incoming-alert');
         if (alertBox) alertBox.classList.add('hidden');
         if (this.sessionCode) {
           socketService.emit('host:decline-connection', { sessionCode: this.sessionCode });
         }
-        document.getElementById('display-host-status').innerText = 'ปฏิเสธคำขอแล้ว';
-        document.getElementById('display-host-status').style.color = 'var(--accent-rose)';
+        this._setStatus('ปฏิเสธคำขอแล้ว', 'var(--accent-rose)');
         this.assistant.speak('ปฏิเสธคำขอเชื่อมต่อเรียบร้อยแล้วค่ะ');
       });
     }
 
-    window.startHostSession = (presetCode, presetPass) => {
-      console.log('[HostDashboard] startHostSession triggered!', { presetCode, presetPass });
-
-      let sessionCode = presetCode;
-      let passcode = presetPass;
-
-      if (!sessionCode || !passcode) {
+    if (btnStart) {
+      btnStart.addEventListener('click', () => {
         const p1 = Math.floor(100 + Math.random() * 900);
         const p2 = Math.floor(100 + Math.random() * 900);
         const p3 = Math.floor(100 + Math.random() * 900);
-        sessionCode = `${p1}-${p2}-${p3}`;
-        passcode = Math.floor(1000 + Math.random() * 9000).toString();
-      }
+        const sessionCode = `${p1}-${p2}-${p3}`;
+        const passcode = Math.floor(1000 + Math.random() * 9000).toString();
+        const permSelectEl = document.getElementById('host-permission-select');
+        const permissions = permSelectEl ? permSelectEl.value : 'full';
 
-      this.sessionCode = sessionCode;
-      this.passcode = passcode;
-      this.isHosting = true;
-      sessionStorage.setItem('orm_host_session', JSON.stringify({ sessionCode, passcode }));
+        this.sessionCode = sessionCode;
+        this.passcode = passcode;
+        this.isHosting = true;
+        sessionStorage.setItem('orm_host_session', JSON.stringify({ sessionCode, passcode }));
 
-      // Instantly update UI DOM (0ms response time)
-      const startPanel = document.getElementById('host-start-panel');
-      const activePanel = document.getElementById('host-active-panel');
-      if (startPanel) startPanel.classList.add('hidden');
-      if (activePanel) activePanel.classList.remove('hidden');
-
-      const dispCode = document.getElementById('display-session-code');
-      const dispPass = document.getElementById('display-passcode');
-      if (dispCode) dispCode.innerText = sessionCode;
-      if (dispPass) dispPass.innerText = passcode;
-
-      const permSelectEl = document.getElementById('host-permission-select');
-      const permissions = permSelectEl ? permSelectEl.value : 'full';
-
-      // Initialize WebRTC as Host
-      try {
+        this._showActivePanel(sessionCode, passcode);
         rtcService.initWebRTC(sessionCode, true);
-      } catch (err) {
-        console.warn('WebRTC init warning:', err);
-      }
-
-      // Register session on server
-      socketService.emit('host:create-session', { customSessionCode: sessionCode, customPasscode: passcode, permissions });
-
-      if (this.assistant) {
+        socketService.emit('host:create-session', { customSessionCode: sessionCode, customPasscode: passcode, permissions });
         this.assistant.notifySessionCreated(sessionCode, passcode);
-      }
-    };
-
-    if (btnStart) {
-      btnStart.addEventListener('click', window.startHostSession);
+      });
     }
 
     if (btnStop) {
-      btnStop.addEventListener('click', () => {
-        this.stopHosting();
-      });
+      btnStop.addEventListener('click', () => this.stopHosting());
     }
 
     if (btnCopy) {
       btnCopy.addEventListener('click', () => {
         if (this.sessionCode && this.passcode) {
-          navigator.clipboard.writeText(`ormConnect ID: ${this.sessionCode} | Passcode: ${this.passcode}`);
-          this.assistant.speak('คัดลอกรหัสเรียบร้อยแล้วค่ะ! ส่งให้เพื่อนผ่านแชทได้เลยนะคะ 👍');
+          navigator.clipboard.writeText(`ormConnect ID: ${this.sessionCode} | Passcode: ${this.passcode}`).then(() => {
+            this.assistant.speak('คัดลอกรหัสเรียบร้อยแล้วค่ะ! ส่งให้เพื่อนผ่านแชทได้เลยนะคะ 👍');
+          });
         }
       });
     }
 
-    // Listen for Socket Events
-    socketService.on('host:session-created', ({ sessionCode, passcode }) => {
-      if (btnStart) {
-        btnStart.disabled = false;
-        btnStart.innerHTML = '<i class="fa-solid fa-play"></i> เริ่มสร้าง Session แชร์หน้าจอ';
-      }
+    // Store handleStartShare ref for use in socket events
+    this._handleStartShare = handleStartShare;
 
+    // Setup fake cursor overlay for Host to see Viewer's pointer
+    this._setupFakeCursor();
+  }
+
+  // ──────────────────────────────────────────────────────
+  // Socket Event Listeners (registered once in constructor)
+  // ──────────────────────────────────────────────────────
+  _registerSocketEvents() {
+    if (this._eventsRegistered) return;
+    this._eventsRegistered = true;
+
+    // Session created confirmation from server
+    socketService.on('host:session-created', ({ sessionCode, passcode }) => {
+      this.sessionCode = sessionCode;
+      this.passcode = passcode;
+      this.isHosting = true;
+      sessionStorage.setItem('orm_host_session', JSON.stringify({ sessionCode, passcode }));
+      this._showActivePanel(sessionCode, passcode);
+      rtcService.initWebRTC(sessionCode, true);
+      this.assistant.notifySessionCreated(sessionCode, passcode);
+    });
+
+    // Session recovered after refresh
+    socketService.on('host:session-recovered', ({ sessionCode, passcode, hasViewer }) => {
       this.sessionCode = sessionCode;
       this.passcode = passcode;
       this.isHosting = true;
 
-      const startPanel = document.getElementById('host-start-panel');
-      const activePanel = document.getElementById('host-active-panel');
-      if (startPanel) startPanel.classList.add('hidden');
-      if (activePanel) activePanel.classList.remove('hidden');
-
-      const dispCode = document.getElementById('display-session-code');
-      const dispPass = document.getElementById('display-passcode');
-      if (dispCode) dispCode.innerText = sessionCode;
-      if (dispPass) dispPass.innerText = passcode;
-
-      // Initialize WebRTC as Host
-      rtcService.initWebRTC(sessionCode, true);
-
-      this.assistant.notifySessionCreated(sessionCode, passcode);
-    });
-
-    socketService.on('session:ended', ({ message }) => {
-      this.stopHosting(false); // don't emit disconnect if server ended it
-      this.assistant.notifyError(message || 'Session ถูกปิดแล้วค่ะ');
-    });
-
-    socketService.on('host:session-recovered', ({ sessionCode, hasViewer }) => {
-      const activePanel = document.getElementById('host-active-panel');
-      const startPanel = document.getElementById('host-start-panel');
-      if (startPanel) startPanel.classList.add('hidden');
-      if (activePanel) activePanel.classList.remove('hidden');
-      document.getElementById('display-session-code').innerText = sessionCode;
-      document.getElementById('display-passcode').innerText = this.passcode;
-
-      document.getElementById('display-host-status').innerText = hasViewer ? 'กำลังถูกควบคุม (Active)' : 'รอเพื่อนเชื่อมต่อ...';
-      document.getElementById('display-host-status').style.color = hasViewer ? 'var(--accent-emerald)' : 'var(--accent-amber)';
+      const statusText = hasViewer ? 'กำลังถูกควบคุม (Active)' : 'รอเพื่อนเชื่อมต่อ...';
+      const statusColor = hasViewer ? 'var(--accent-emerald)' : 'var(--accent-amber)';
+      this._showActivePanel(sessionCode, passcode, statusText);
+      this._setStatus(statusText, statusColor);
       this.assistant.speak('กู้คืน Session สำเร็จค่ะ');
+
+      rtcService.initWebRTC(sessionCode, true);
       if (hasViewer) {
-        rtcService.initWebRTC(sessionCode, true);
         rtcService.startScreenShare();
       }
     });
 
+    // Session expired — clear storage
+    socketService.on('host:session-expired', () => {
+      sessionStorage.removeItem('orm_host_session');
+      this.sessionCode = null;
+      this.passcode = null;
+      this.isHosting = false;
+      document.getElementById('host-start-panel')?.classList.remove('hidden');
+      document.getElementById('host-active-panel')?.classList.add('hidden');
+      this.assistant.notifyError('Session หมดอายุแล้วค่ะ กรุณาสร้าง Session ใหม่');
+    });
+
+    // Re-connect on socket reconnect
     socketService.on('status-change', ({ connected }) => {
-      if (connected && this.isHosting && this.sessionCode) {
+      if (connected && this.isHosting && this.sessionCode && this.passcode) {
         socketService.emit('host:recover-session', { sessionCode: this.sessionCode, passcode: this.passcode });
       }
     });
 
-    socketService.on('host:viewer-joined', async () => {
-      document.getElementById('display-host-status').innerText = 'มีคำขอเชื่อมต่อเข้ามา (รอการอนุมัติ)...';
-      document.getElementById('display-host-status').style.color = 'var(--accent-amber)';
-
+    // Viewer joined and waiting for approval
+    socketService.on('host:viewer-joined', () => {
+      this._setStatus('มีคำขอเชื่อมต่อเข้ามา (รอการอนุมัติ)...', 'var(--accent-amber)');
+      const alertBox = document.getElementById('host-incoming-alert');
       if (alertBox) alertBox.classList.remove('hidden');
 
-      // Prompt with Nong Orm Assistant
       this.assistant.notifyIncomingConnection(this.sessionCode, () => {
-        handleStartShare();
+        if (this._handleStartShare) this._handleStartShare();
       });
     });
 
+    // Viewer recovered after their refresh
     socketService.on('host:viewer-recovered', () => {
-      document.getElementById('display-host-status').innerText = 'ผู้เชื่อมต่อกลับมาแล้ว (Active)';
-      document.getElementById('display-host-status').style.color = 'var(--accent-emerald)';
-      this.assistant.speak('ผู้เชื่อมต่อกลับมาแล้วค่ะ กำลังส่งสัญญาณภาพต่อ...');
-      
+      this._setStatus('ผู้เชื่อมต่อกลับมาแล้ว (Active)', 'var(--accent-emerald)');
+      this.assistant.speak('ผู้เชื่อมต่อกลับมาแล้วค่ะ กำลังส่งสัญญาณภาพใหม่...');
       rtcService.initWebRTC(this.sessionCode, true);
       rtcService.startScreenShare();
     });
 
-    // --- Simulated Interactive Cursor Overlay ---
+    // Viewer disconnected
+    socketService.on('host:viewer-disconnected', () => {
+      this._setStatus('ผู้เชื่อมต่อออกไปแล้ว', 'var(--accent-amber)');
+      this.assistant.speak('ผู้เชื่อมต่อออกจาก Session แล้วค่ะ');
+    });
+
+    // Session ended by server
+    socketService.on('session:ended', ({ message }) => {
+      this.stopHosting(false);
+      this.assistant.notifyError(message || 'Session ถูกปิดแล้วค่ะ');
+    });
+
+    // Screen share ended by user clicking browser stop button
+    rtcService.on('screen-share-ended', () => {
+      this._setStatus('หยุดแชร์หน้าจอแล้ว', 'var(--accent-amber)');
+      this.assistant.speak('คุณหยุดแชร์หน้าจอแล้วค่ะ');
+    });
+  }
+
+  // ──────────────────────────────────────────────────────
+  // Fake Cursor Overlay (Host sees Viewer's mouse)
+  // ──────────────────────────────────────────────────────
+  _setupFakeCursor() {
     let fakeCursor = document.getElementById('fake-viewer-cursor');
     if (!fakeCursor) {
       fakeCursor = document.createElement('div');
       fakeCursor.id = 'fake-viewer-cursor';
-      fakeCursor.style.position = 'fixed';
-      fakeCursor.style.width = '20px';
-      fakeCursor.style.height = '20px';
-      fakeCursor.style.background = 'rgba(255, 50, 50, 0.7)';
-      fakeCursor.style.border = '2px solid white';
-      fakeCursor.style.borderRadius = '50%';
-      fakeCursor.style.pointerEvents = 'none';
-      fakeCursor.style.zIndex = '999999';
-      fakeCursor.style.display = 'none';
-      fakeCursor.style.transition = 'transform 0.1s, background 0.1s';
-      fakeCursor.style.boxShadow = '0 0 10px rgba(255, 50, 50, 0.5)';
+      Object.assign(fakeCursor.style, {
+        position: 'fixed', width: '16px', height: '16px',
+        background: 'rgba(255, 50, 50, 0.85)',
+        border: '2px solid rgba(255,255,255,0.8)',
+        borderRadius: '50%', pointerEvents: 'none',
+        zIndex: '999999', display: 'none',
+        transition: 'background 0.1s',
+        boxShadow: '0 0 8px rgba(255, 50, 50, 0.6)',
+        transform: 'translate(-50%, -50%)'
+      });
       document.body.appendChild(fakeCursor);
     }
 
@@ -335,48 +347,46 @@ export class HostDashboard {
     if (!fakeCursorLabel) {
       fakeCursorLabel = document.createElement('div');
       fakeCursorLabel.id = 'fake-viewer-cursor-label';
-      fakeCursorLabel.style.position = 'fixed';
-      fakeCursorLabel.style.background = 'rgba(0,0,0,0.8)';
-      fakeCursorLabel.style.color = '#00f0ff';
-      fakeCursorLabel.style.padding = '4px 8px';
-      fakeCursorLabel.style.borderRadius = '4px';
-      fakeCursorLabel.style.fontSize = '12px';
-      fakeCursorLabel.style.pointerEvents = 'none';
-      fakeCursorLabel.style.zIndex = '999999';
-      fakeCursorLabel.style.display = 'none';
+      Object.assign(fakeCursorLabel.style, {
+        position: 'fixed', background: 'rgba(0,0,0,0.85)',
+        color: '#00f0ff', padding: '3px 8px',
+        borderRadius: '4px', fontSize: '11px',
+        fontFamily: 'monospace', pointerEvents: 'none',
+        zIndex: '999999', display: 'none',
+        transform: 'translateY(-50%)'
+      });
       document.body.appendChild(fakeCursorLabel);
     }
 
     rtcService.on('input-event', (data) => {
       if (!this.isHosting) return;
-
       if (data.type === 'mousemove') {
         fakeCursor.style.display = 'block';
         fakeCursor.style.left = (data.payload.xRatio * window.innerWidth) + 'px';
         fakeCursor.style.top = (data.payload.yRatio * window.innerHeight) + 'px';
       } else if (data.type === 'mousedown') {
-        fakeCursor.style.background = 'rgba(0, 240, 255, 0.9)';
-        fakeCursor.style.transform = 'scale(0.8)';
-        fakeCursor.style.boxShadow = '0 0 15px rgba(0, 240, 255, 0.8)';
+        fakeCursor.style.background = 'rgba(0, 240, 255, 0.95)';
+        fakeCursor.style.boxShadow = '0 0 14px rgba(0, 240, 255, 0.8)';
       } else if (data.type === 'mouseup') {
-        fakeCursor.style.background = 'rgba(255, 50, 50, 0.7)';
-        fakeCursor.style.transform = 'scale(1)';
-        fakeCursor.style.boxShadow = '0 0 10px rgba(255, 50, 50, 0.5)';
+        fakeCursor.style.background = 'rgba(255, 50, 50, 0.85)';
+        fakeCursor.style.boxShadow = '0 0 8px rgba(255, 50, 50, 0.6)';
       } else if (data.type === 'keydown' || data.type === 'shortcut') {
         const key = data.type === 'keydown' ? data.payload.key : data.payload.combo;
-        fakeCursorLabel.innerText = `[Viewer กดปุ่ม: ${key}]`;
+        fakeCursorLabel.innerText = `[${key}]`;
         fakeCursorLabel.style.display = 'block';
-        fakeCursorLabel.style.left = (parseInt(fakeCursor.style.left || 0) + 25) + 'px';
+        fakeCursorLabel.style.left = (parseFloat(fakeCursor.style.left || 0) + 20) + 'px';
         fakeCursorLabel.style.top = fakeCursor.style.top;
-        
-        clearTimeout(this.keyLabelTimeout);
-        this.keyLabelTimeout = setTimeout(() => {
+        clearTimeout(this._keyLabelTimeout);
+        this._keyLabelTimeout = setTimeout(() => {
           fakeCursorLabel.style.display = 'none';
-        }, 2000);
+        }, 1500);
       }
     });
   }
 
+  // ──────────────────────────────────────────────────────
+  // Stop Hosting
+  // ──────────────────────────────────────────────────────
   stopHosting(emitDisconnect = true) {
     if (this.sessionCode && emitDisconnect) {
       socketService.emit('session:disconnect', { sessionCode: this.sessionCode });
@@ -384,12 +394,17 @@ export class HostDashboard {
     rtcService.close();
     sessionStorage.removeItem('orm_host_session');
 
+    // Hide fake cursor
+    const fakeCursor = document.getElementById('fake-viewer-cursor');
+    if (fakeCursor) fakeCursor.style.display = 'none';
+
     this.sessionCode = null;
     this.passcode = null;
     this.isHosting = false;
 
-    document.getElementById('host-start-panel').classList.remove('hidden');
-    document.getElementById('host-active-panel').classList.add('hidden');
+    document.getElementById('host-start-panel')?.classList.remove('hidden');
+    document.getElementById('host-active-panel')?.classList.add('hidden');
+    document.getElementById('host-incoming-alert')?.classList.add('hidden');
     this.assistant.speak('ปิด Session เรียบร้อยแล้วค่ะ');
   }
 }

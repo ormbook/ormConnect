@@ -50,6 +50,10 @@ function generatePasscode() {
 io.on('connection', (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
 
+  // ──────────────────────────────────────────────
+  // HOST EVENTS
+  // ──────────────────────────────────────────────
+
   // Host registers a new remote session
   socket.on('host:create-session', ({ customSessionCode, customPasscode, permissions }) => {
     const sessionCode = customSessionCode || generateSessionCode();
@@ -58,9 +62,11 @@ io.on('connection', (socket) => {
     const sessionData = {
       hostSocketId: socket.id,
       passcode,
-      permissions: permissions || 'full', // 'full', 'view-only', 'confirm'
+      permissions: permissions || 'full', // 'full', 'view-only'
       viewerSocketId: null,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      hostDisconnectedTimer: null,
+      viewerDisconnectedTimer: null
     };
 
     sessions.set(sessionCode, sessionData);
@@ -75,33 +81,71 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Viewer attempts to connect to a host using session code
-  socket.on('viewer:request-connect', ({ sessionCode }) => {
-    const formattedCode = sessionCode.trim();
-    const session = sessions.get(formattedCode);
-
+  // Host recovers session after page refresh
+  socket.on('host:recover-session', ({ sessionCode, passcode }) => {
+    const session = sessions.get(sessionCode);
     if (!session) {
-      return socket.emit('viewer:connect-error', {
-        message: 'ไม่พบ Session ID นี้ กรุณาตรวจสอบรหัสอีกครั้งค่ะ'
-      });
+      // Session expired — notify host to start fresh
+      socket.emit('host:session-expired', { sessionCode });
+      return;
+    }
+    // Accept recovery even from different socket (page refresh)
+    if (session.passcode !== passcode) {
+      socket.emit('host:session-expired', { sessionCode });
+      return;
     }
 
-    if (session.viewerSocketId) {
-      return socket.emit('viewer:connect-error', {
-        message: 'Session นี้มีผู้เชื่อมต่ออยู่แล้วค่ะ'
-      });
-    }
+    clearTimeout(session.hostDisconnectedTimer);
+    session.hostDisconnectedTimer = null;
+    session.hostSocketId = socket.id;
+    socket.join(sessionCode);
 
-    // Request passcode from viewer
-    socket.emit('viewer:require-passcode', { sessionCode: formattedCode });
+    console.log(`[Host] Recovered Session ${sessionCode} on new socket ${socket.id}`);
+
+    socket.emit('host:session-recovered', {
+      sessionCode,
+      passcode: session.passcode,
+      permissions: session.permissions,
+      hasViewer: !!session.viewerSocketId
+    });
   });
 
-  // Viewer submits passcode for verification
+  // Host accepts connection request
+  socket.on('host:accept-connection', ({ sessionCode }) => {
+    console.log(`[Host] Accepted connection for session ${sessionCode}`);
+    const session = sessions.get(sessionCode);
+    if (session && session.viewerSocketId) {
+      io.to(session.viewerSocketId).emit('viewer:connect-approved', {
+        sessionCode,
+        permissions: session.permissions
+      });
+    }
+  });
+
+  // Host declines connection request
+  socket.on('host:decline-connection', ({ sessionCode }) => {
+    console.log(`[Host] Declined connection for session ${sessionCode}`);
+    const session = sessions.get(sessionCode);
+    if (session) {
+      if (session.viewerSocketId) {
+        io.to(session.viewerSocketId).emit('viewer:connect-declined', {
+          message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
+        });
+      }
+      session.viewerSocketId = null;
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // VIEWER EVENTS
+  // ──────────────────────────────────────────────
+
+  // Viewer attempts to connect using session code + passcode directly
   socket.on('viewer:verify-passcode', ({ sessionCode, passcode }) => {
     const session = sessions.get(sessionCode);
     if (!session) {
       return socket.emit('viewer:connect-error', {
-        message: 'Session หมดอายุแล้วค่ะ กรุณาลองใหม่อีกครั้ง'
+        message: 'ไม่พบ Session ID นี้ หรือ Session หมดอายุแล้วค่ะ กรุณาตรวจสอบรหัสอีกครั้ง'
       });
     }
 
@@ -130,19 +174,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Host accepts connection request
-  socket.on('host:accept-connection', ({ sessionCode }) => {
-    console.log(`[Host] Accepted connection for session ${sessionCode}`);
-    const session = sessions.get(sessionCode);
-    if (session && session.viewerSocketId) {
-      io.to(session.viewerSocketId).emit('viewer:connect-approved', {
-        sessionCode,
-        permissions: session.permissions
-      });
-    }
-  });
-
-  // Viewer recovers connection
+  // Viewer recovers connection after page refresh
   socket.on('viewer:recover-session', ({ sessionCode }) => {
     const session = sessions.get(sessionCode);
     if (session) {
@@ -151,33 +183,24 @@ io.on('connection', (socket) => {
       session.viewerDisconnectedTimer = null;
       session.viewerSocketId = socket.id;
       socket.join(sessionCode);
+
+      // Immediately approve — viewer was already approved before refresh
       socket.emit('viewer:connect-approved', {
         sessionCode,
         permissions: session.permissions
       });
-      // Notify Host to re-initialize and send new WebRTC offer
+
+      // Notify Host to resend WebRTC offer for the new peer connection
       io.to(session.hostSocketId).emit('host:viewer-recovered');
+    } else {
+      // Session no longer exists — tell viewer to reconnect from scratch
+      socket.emit('viewer:session-expired');
     }
   });
 
-  // Host declines connection request
-  socket.on('host:decline-connection', ({ sessionCode }) => {
-    console.log(`[Host] Declined connection for session ${sessionCode}`);
-    const session = sessions.get(sessionCode);
-    if (session) {
-      if (session.viewerSocketId) {
-        io.to(session.viewerSocketId).emit('viewer:connect-declined', {
-          message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
-        });
-      }
-      io.to(sessionCode).emit('viewer:connect-declined', {
-        message: 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ'
-      });
-      session.viewerSocketId = null;
-    }
-  });
-
-  // WebRTC Signaling (Peer-to-Peer)
+  // ──────────────────────────────────────────────
+  // WebRTC Signaling (Peer-to-Peer relay)
+  // ──────────────────────────────────────────────
   socket.on('rtc:offer', ({ sessionCode, offer }) => {
     socket.to(sessionCode).emit('rtc:offer', { offer });
   });
@@ -190,7 +213,9 @@ io.on('connection', (socket) => {
     socket.to(sessionCode).emit('rtc:candidate', { candidate });
   });
 
+  // ──────────────────────────────────────────────
   // Chat & File Transfer Signaling
+  // ──────────────────────────────────────────────
   socket.on('chat:message', (data) => {
     socket.to(data.sessionCode).emit('chat:message', data);
   });
@@ -207,14 +232,18 @@ io.on('connection', (socket) => {
     socket.to(data.sessionCode).emit('file:transfer-decline', data);
   });
 
-  // Disconnect session explicitly
+  // ──────────────────────────────────────────────
+  // Session Lifecycle
+  // ──────────────────────────────────────────────
+
+  // Explicit session disconnect (by user action)
   socket.on('session:disconnect', ({ sessionCode }) => {
     console.log(`[Session] User requested disconnect for ${sessionCode}`);
     io.to(sessionCode).emit('session:ended', { message: 'การเชื่อมต่อถูกตัดแล้วค่ะ' });
     sessions.delete(sessionCode);
   });
 
-  // Socket disconnected with 60-second grace period (supports mobile tab switching & screen lock)
+  // Socket disconnected — grace period before cleanup (supports mobile tab switching & screen lock)
   socket.on('disconnect', () => {
     console.log(`[Socket] Client disconnected: ${socket.id}`);
 
@@ -228,7 +257,7 @@ io.on('connection', (socket) => {
       } else if (session.viewerSocketId === socket.id) {
         session.viewerDisconnectedTimer = setTimeout(() => {
           console.log(`[Session] Viewer disconnected timeout for session ${code}. Removing.`);
-          io.to(code).emit('session:ended', { message: 'ผู้ใช้งานฝั่ง Viewer ตัดการเชื่อมต่อแล้วค่ะ' });
+          io.to(session.hostSocketId).emit('host:viewer-disconnected');
           session.viewerSocketId = null;
         }, 60000); // 60 seconds grace period for Viewer socket reconnect
       }
@@ -236,13 +265,14 @@ io.on('connection', (socket) => {
   });
 });
 
-// Periodic cleanup for idle sessions older than 30 minutes (30 mins TTL)
+// Periodic cleanup for idle sessions older than 60 minutes (60 mins TTL)
 setInterval(() => {
   const now = Date.now();
-  const THIRTY_MINUTES = 30 * 60 * 1000;
+  const SIXTY_MINUTES = 60 * 60 * 1000;
   for (const [code, session] of sessions.entries()) {
-    if (now - session.createdAt > THIRTY_MINUTES && !session.viewerSocketId) {
-      console.log(`[Session] Session ${code} expired after 30 minutes idle.`);
+    if (now - session.createdAt > SIXTY_MINUTES) {
+      console.log(`[Session] Session ${code} expired after 60 minutes. Removing.`);
+      io.to(code).emit('session:ended', { message: 'Session หมดอายุแล้วค่ะ (60 นาที)' });
       sessions.delete(code);
     }
   }

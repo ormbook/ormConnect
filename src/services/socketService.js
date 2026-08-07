@@ -18,8 +18,9 @@ class SocketService {
     );
 
     this.socket = io(serverUrl, {
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000
+      reconnectionAttempts: 15,
+      reconnectionDelay: 1000,
+      timeout: 10000
     });
 
     this.socket.on('connect', () => {
@@ -42,12 +43,17 @@ class SocketService {
     // Register forwarding for all socket events
     const events = [
       'host:session-created',
+      'host:session-recovered',
+      'host:session-expired',
       'host:viewer-joined',
+      'host:viewer-recovered',
+      'host:viewer-disconnected',
       'viewer:require-passcode',
       'viewer:waiting-host-approval',
       'viewer:connect-approved',
-      'viewer:connect-success',
+      'viewer:connect-declined',
       'viewer:connect-error',
+      'viewer:session-expired',
       'rtc:offer',
       'rtc:answer',
       'rtc:candidate',
@@ -55,10 +61,7 @@ class SocketService {
       'file:transfer-request',
       'file:transfer-accept',
       'file:transfer-decline',
-      'viewer:connect-declined',
-      'session:ended',
-      'host:viewer-recovered',
-      'host:session-recovered'
+      'session:ended'
     ];
 
     events.forEach(eventName => {
@@ -69,7 +72,7 @@ class SocketService {
   }
 
   emit(eventName, data) {
-    if (!this.socket || !this.connected) {
+    if (!this.socket) {
       this.connect();
     }
     if (this.socket) {
@@ -82,6 +85,12 @@ class SocketService {
       this.listeners.set(eventName, []);
     }
     this.listeners.get(eventName).push(callback);
+  }
+
+  off(eventName, callback) {
+    if (!this.listeners.has(eventName)) return;
+    const list = this.listeners.get(eventName).filter(cb => cb !== callback);
+    this.listeners.set(eventName, list);
   }
 
   trigger(eventName, data) {
