@@ -88,19 +88,29 @@ class RTCService {
     });
   }
 
-  // Host starts sharing display screen (with Canvas stream fallback)
+  // Host starts sharing display screen (with iOS Safari compatibility & Canvas fallback)
   async startScreenShare() {
     try {
-      // Attempt browser screen capture first
-      this.localStream = await navigator.mediaDevices.getDisplayMedia({
+      // Detect iOS / iPhone / iPad Safari
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      // iOS Safari requires simple video: true constraint without complex object properties
+      const constraints = isIOS ? {
+        video: true,
+        audio: false
+      } : {
         video: {
           cursor: 'always',
           frameRate: { ideal: 60, max: 60 }
         },
-        audio: false // Set audio false to prevent OverconstrainedError on Chrome
-      });
+        audio: false
+      };
+
+      console.log('[WebRTC] Requesting getDisplayMedia with constraints:', constraints);
+      this.localStream = await navigator.mediaDevices.getDisplayMedia(constraints);
     } catch (err) {
-      console.warn('[WebRTC] getDisplayMedia cancelled or unsupported. Generating fallback stream:', err);
+      console.warn('[WebRTC] getDisplayMedia cancelled or unsupported on this device. Generating fallback stream:', err);
       // Fallback: Generate live interactive Desktop Canvas stream if screen share is cancelled or unsupported
       this.localStream = this.createFallbackCanvasStream();
     }

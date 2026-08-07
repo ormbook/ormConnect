@@ -129,6 +129,15 @@ export class HostDashboard {
     }
 
     btnStart.addEventListener('click', () => {
+      // Check for LINE / FB In-App browser on iOS
+      const ua = navigator.userAgent || '';
+      const isIOS = /iPad|iPhone|iPod/.test(ua);
+      const isInApp = /Line|FB_IAB|FB4A|Instagram/i.test(ua);
+
+      if (isIOS && isInApp) {
+        this.assistant.speak('💡 **ข้อแนะนำสำหรับ iPhone:** คุณเปิดลิงก์ผ่านแอป LINE/Facebook แนะนำให้กดปุ่ม 3 จุดแล้วเลือก **"Open in Safari (เปิดใน Safari)"** เพื่อให้ระบบรองรับการแชร์หน้าจอมือถือได้ 100% นะคะ');
+      }
+
       const permissions = permSelect.value;
       socketService.emit('host:create-session', { permissions });
     });
