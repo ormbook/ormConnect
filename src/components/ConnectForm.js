@@ -84,6 +84,8 @@ export class ConnectForm {
       const inputCodeEl = document.getElementById('input-session-code');
       const inputPasscodeEl = document.getElementById('input-passcode');
       const passcodeGroupEl = document.getElementById('passcode-input-group');
+      const statusBoxEl = document.getElementById('viewer-status-card');
+      const btnConnectEl = document.getElementById('btn-connect-remote');
 
       const code = inputCodeEl ? inputCodeEl.value.trim() : '';
       if (!code) {
@@ -105,11 +107,26 @@ export class ConnectForm {
           if (this.assistant) this.assistant.notifyError('กรุณากรอก Passcode ด้วยนะคะ');
           return;
         }
+
+        // Show Instant Waiting Card & Loading Spinner
+        if (btnConnectEl) {
+          btnConnectEl.disabled = true;
+          btnConnectEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่งคำขอไปยัง Host...';
+        }
+        if (statusBoxEl) {
+          statusBoxEl.classList.remove('hidden');
+          statusBoxEl.innerHTML = `
+            <i class="fa-solid fa-clock fa-spin" style="color: var(--primary-cyan); font-size: 1.6rem; margin-bottom: 0.5rem;"></i>
+            <div style="font-size: 1rem; font-weight: 700; color: #fff;">ส่งคำขอเชื่อมต่อสำเร็จแล้วค่ะ!</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.3rem;">กำลังรอให้ฝั่ง Host กดปุ่ม "อนุมัติ & เริ่มแชร์หน้าจอ"</p>
+          `;
+        }
+
         socketService.emit('viewer:verify-passcode', {
           sessionCode: this.targetSessionCode || code,
           passcode
         });
-        if (this.assistant) this.assistant.speak('กำลังตรวจสอบรหัสผ่านและส่งคำขอไปยังฝั่ง Host ค่ะ...');
+        if (this.assistant) this.assistant.speak('กำลังส่งคำขอเชื่อมต่อ! รอฝั่ง Host กดปุ่มอนุมัตินะคะ...');
       }
     };
 
@@ -119,33 +136,77 @@ export class ConnectForm {
 
     // Socket Response Events
     socketService.on('viewer:require-passcode', () => {
-      passcodeGroup.classList.remove('hidden');
-      inputPasscode.focus();
+      if (passcodeGroup) passcodeGroup.classList.remove('hidden');
+      if (inputPasscode) inputPasscode.focus();
       this.assistant.speak('พบ Session แล้วค่ะ! กรุณากรอกรหัสผ่าน Passcode 4 หลักของเพื่อนลงในช่องด้านล่างแล้วกด Connect นะคะ');
     });
 
     socketService.on('viewer:waiting-host-approval', ({ message }) => {
-      this.assistant.speak(`⏳ ${message}`);
+      if (this.assistant) this.assistant.speak(`⏳ ${message}`);
     });
 
     socketService.on('viewer:connect-approved', ({ sessionCode, permissions }) => {
+      const btnConnectEl = document.getElementById('btn-connect-remote');
+      const statusBoxEl = document.getElementById('viewer-status-card');
+
+      if (statusBoxEl) {
+        statusBoxEl.innerHTML = `
+          <i class="fa-solid fa-circle-check" style="color: var(--accent-emerald); font-size: 1.6rem; margin-bottom: 0.5rem;"></i>
+          <div style="font-size: 1rem; font-weight: 700; color: var(--accent-emerald);">Host อนุมัติแล้ว!</div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.3rem;">กำลังเปิดหน้าต่าง Remote Viewer...</p>
+        `;
+      }
+
       this.assistant.speak('ฝั่ง Host อนุมัติการเชื่อมต่อแล้วค่ะ! กำลังเปิดหน้าต่างสตรีมมิ่ง...');
       
       // Initialize WebRTC as Viewer
       rtcService.initWebRTC(sessionCode, false);
 
-      if (this.onConnectSuccess) {
-        this.onConnectSuccess(sessionCode, permissions);
-      }
+      setTimeout(() => {
+        if (btnConnectEl) {
+          btnConnectEl.disabled = false;
+          btnConnectEl.innerHTML = '<i class="fa-solid fa-plug"></i> เชื่อมต่อเข้าควบคุม (Connect)';
+        }
+        if (statusBoxEl) statusBoxEl.classList.add('hidden');
+
+        if (this.onConnectSuccess) {
+          this.onConnectSuccess(sessionCode, permissions);
+        }
+      }, 600);
     });
 
     socketService.on('viewer:connect-declined', ({ message }) => {
-      passcodeGroup.classList.add('hidden');
-      inputPasscode.value = '';
+      const btnConnectEl = document.getElementById('btn-connect-remote');
+      const statusBoxEl = document.getElementById('viewer-status-card');
+
+      if (btnConnectEl) {
+        btnConnectEl.disabled = false;
+        btnConnectEl.innerHTML = '<i class="fa-solid fa-plug"></i> เชื่อมต่อเข้าควบคุม (Connect)';
+      }
+      if (statusBoxEl) {
+        statusBoxEl.innerHTML = `
+          <i class="fa-solid fa-circle-xmark" style="color: var(--accent-rose); font-size: 1.6rem; margin-bottom: 0.5rem;"></i>
+          <div style="font-size: 1rem; font-weight: 700; color: var(--accent-rose);">ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ</div>
+        `;
+        setTimeout(() => {
+          statusBoxEl.classList.add('hidden');
+        }, 3000);
+      }
+
+      if (passcodeGroup) passcodeGroup.classList.add('hidden');
+      if (inputPasscode) inputPasscode.value = '';
       this.assistant.notifyError(message || 'ฝั่ง Host ปฏิเสธคำขอเชื่อมต่อค่ะ');
     });
 
     socketService.on('viewer:connect-error', ({ message }) => {
+      const btnConnectEl = document.getElementById('btn-connect-remote');
+      const statusBoxEl = document.getElementById('viewer-status-card');
+
+      if (btnConnectEl) {
+        btnConnectEl.disabled = false;
+        btnConnectEl.innerHTML = '<i class="fa-solid fa-plug"></i> เชื่อมต่อเข้าควบคุม (Connect)';
+      }
+      if (statusBoxEl) statusBoxEl.classList.add('hidden');
       this.assistant.notifyError(message);
     });
   }
