@@ -9,6 +9,20 @@ export class ConnectForm {
     this.targetSessionCode = null;
 
     this.render();
+
+    // Viewer Session Recovery on Refresh
+    const savedViewer = sessionStorage.getItem('orm_viewer_session');
+    if (savedViewer) {
+      try {
+        const { sessionCode } = JSON.parse(savedViewer);
+        this.targetSessionCode = sessionCode;
+        setTimeout(() => {
+          if (socketService.socket && socketService.socket.connected) {
+            socketService.emit('viewer:recover-session', { sessionCode });
+          }
+        }, 0);
+      } catch (err) {}
+    }
   }
 
   render() {
@@ -145,6 +159,9 @@ export class ConnectForm {
     });
 
     socketService.on('viewer:connect-approved', ({ sessionCode, permissions }) => {
+      this.targetSessionCode = sessionCode;
+      sessionStorage.setItem('orm_viewer_session', JSON.stringify({ sessionCode, permissions }));
+
       const btnConnectEl = document.getElementById('btn-connect-remote');
       const statusBoxEl = document.getElementById('viewer-status-card');
 
@@ -207,6 +224,12 @@ export class ConnectForm {
       }
       if (statusBoxEl) statusBoxEl.classList.add('hidden');
       this.assistant.notifyError(message);
+    });
+
+    socketService.on('status-change', ({ connected }) => {
+      if (connected && this.targetSessionCode) {
+        socketService.emit('viewer:recover-session', { sessionCode: this.targetSessionCode });
+      }
     });
   }
 }

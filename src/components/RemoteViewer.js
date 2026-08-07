@@ -251,6 +251,8 @@ export class RemoteViewer {
       socketService.emit('session:disconnect', { sessionCode: this.sessionCode });
     }
     rtcService.close();
+    sessionStorage.removeItem('orm_viewer_session');
+    
     this.overlay.classList.add('hidden');
     this.assistant.speak('ตัดการเชื่อมต่อ Remote Session เรียบร้อยแล้วค่ะ');
   }

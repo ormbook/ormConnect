@@ -142,6 +142,22 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Viewer recovers connection
+  socket.on('viewer:recover-session', ({ sessionCode }) => {
+    const session = sessions.get(sessionCode);
+    if (session) {
+      console.log(`[Viewer] Recovered Session ${sessionCode} on new socket ${socket.id}`);
+      clearTimeout(session.viewerDisconnectedTimer);
+      session.viewerDisconnectedTimer = null;
+      session.viewerSocketId = socket.id;
+      socket.join(sessionCode);
+      socket.emit('viewer:connect-approved', {
+        sessionCode,
+        permissions: session.permissions
+      });
+    }
+  });
+
   // Host declines connection request
   socket.on('host:decline-connection', ({ sessionCode }) => {
     console.log(`[Host] Declined connection for session ${sessionCode}`);

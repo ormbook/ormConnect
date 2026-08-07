@@ -302,6 +302,70 @@ export class HostDashboard {
         handleStartShare();
       });
     });
+
+    // --- Simulated Interactive Cursor Overlay ---
+    let fakeCursor = document.getElementById('fake-viewer-cursor');
+    if (!fakeCursor) {
+      fakeCursor = document.createElement('div');
+      fakeCursor.id = 'fake-viewer-cursor';
+      fakeCursor.style.position = 'fixed';
+      fakeCursor.style.width = '20px';
+      fakeCursor.style.height = '20px';
+      fakeCursor.style.background = 'rgba(255, 50, 50, 0.7)';
+      fakeCursor.style.border = '2px solid white';
+      fakeCursor.style.borderRadius = '50%';
+      fakeCursor.style.pointerEvents = 'none';
+      fakeCursor.style.zIndex = '999999';
+      fakeCursor.style.display = 'none';
+      fakeCursor.style.transition = 'transform 0.1s, background 0.1s';
+      fakeCursor.style.boxShadow = '0 0 10px rgba(255, 50, 50, 0.5)';
+      document.body.appendChild(fakeCursor);
+    }
+
+    let fakeCursorLabel = document.getElementById('fake-viewer-cursor-label');
+    if (!fakeCursorLabel) {
+      fakeCursorLabel = document.createElement('div');
+      fakeCursorLabel.id = 'fake-viewer-cursor-label';
+      fakeCursorLabel.style.position = 'fixed';
+      fakeCursorLabel.style.background = 'rgba(0,0,0,0.8)';
+      fakeCursorLabel.style.color = '#00f0ff';
+      fakeCursorLabel.style.padding = '4px 8px';
+      fakeCursorLabel.style.borderRadius = '4px';
+      fakeCursorLabel.style.fontSize = '12px';
+      fakeCursorLabel.style.pointerEvents = 'none';
+      fakeCursorLabel.style.zIndex = '999999';
+      fakeCursorLabel.style.display = 'none';
+      document.body.appendChild(fakeCursorLabel);
+    }
+
+    rtcService.on('input-event', (data) => {
+      if (!this.isHosting) return;
+
+      if (data.type === 'mousemove') {
+        fakeCursor.style.display = 'block';
+        fakeCursor.style.left = (data.payload.xRatio * window.innerWidth) + 'px';
+        fakeCursor.style.top = (data.payload.yRatio * window.innerHeight) + 'px';
+      } else if (data.type === 'mousedown') {
+        fakeCursor.style.background = 'rgba(0, 240, 255, 0.9)';
+        fakeCursor.style.transform = 'scale(0.8)';
+        fakeCursor.style.boxShadow = '0 0 15px rgba(0, 240, 255, 0.8)';
+      } else if (data.type === 'mouseup') {
+        fakeCursor.style.background = 'rgba(255, 50, 50, 0.7)';
+        fakeCursor.style.transform = 'scale(1)';
+        fakeCursor.style.boxShadow = '0 0 10px rgba(255, 50, 50, 0.5)';
+      } else if (data.type === 'keydown' || data.type === 'shortcut') {
+        const key = data.type === 'keydown' ? data.payload.key : data.payload.combo;
+        fakeCursorLabel.innerText = `[Viewer กดปุ่ม: ${key}]`;
+        fakeCursorLabel.style.display = 'block';
+        fakeCursorLabel.style.left = (parseInt(fakeCursor.style.left || 0) + 25) + 'px';
+        fakeCursorLabel.style.top = fakeCursor.style.top;
+        
+        clearTimeout(this.keyLabelTimeout);
+        this.keyLabelTimeout = setTimeout(() => {
+          fakeCursorLabel.style.display = 'none';
+        }, 2000);
+      }
+    });
   }
 
   stopHosting(emitDisconnect = true) {
