@@ -140,8 +140,27 @@ export class HostDashboard {
 
     if (btnStart) {
       btnStart.addEventListener('click', () => {
-        btnStart.disabled = true;
-        btnStart.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังสร้าง Session...';
+        // Generate Instant Local Session Code & Passcode
+        const p1 = Math.floor(100 + Math.random() * 900);
+        const p2 = Math.floor(100 + Math.random() * 900);
+        const p3 = Math.floor(100 + Math.random() * 900);
+        const sessionCode = `${p1}-${p2}-${p3}`;
+        const passcode = Math.floor(1000 + Math.random() * 9000).toString();
+
+        this.sessionCode = sessionCode;
+        this.passcode = passcode;
+        this.isHosting = true;
+
+        // Instantly update UI DOM (0ms response time)
+        const startPanel = document.getElementById('host-start-panel');
+        const activePanel = document.getElementById('host-active-panel');
+        if (startPanel) startPanel.classList.add('hidden');
+        if (activePanel) activePanel.classList.remove('hidden');
+
+        const dispCode = document.getElementById('display-session-code');
+        const dispPass = document.getElementById('display-passcode');
+        if (dispCode) dispCode.innerText = sessionCode;
+        if (dispPass) dispPass.innerText = passcode;
 
         // Check for LINE / FB In-App browser on iOS
         const ua = navigator.userAgent || '';
@@ -153,7 +172,14 @@ export class HostDashboard {
         }
 
         const permissions = permSelect ? permSelect.value : 'full';
-        socketService.emit('host:create-session', { permissions });
+
+        // Initialize WebRTC as Host
+        rtcService.initWebRTC(sessionCode, true);
+
+        // Register session on server
+        socketService.emit('host:create-session', { customSessionCode: sessionCode, customPasscode: passcode, permissions });
+
+        this.assistant.notifySessionCreated(sessionCode, passcode);
       });
     }
 

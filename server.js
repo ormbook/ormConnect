@@ -51,8 +51,8 @@ io.on('connection', (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
 
   // Host registers a new remote session
-  socket.on('host:create-session', ({ customPasscode, permissions }) => {
-    const sessionCode = generateSessionCode();
+  socket.on('host:create-session', ({ customSessionCode, customPasscode, permissions }) => {
+    const sessionCode = customSessionCode || generateSessionCode();
     const passcode = customPasscode || generatePasscode();
 
     const sessionData = {
@@ -66,7 +66,7 @@ io.on('connection', (socket) => {
     sessions.set(sessionCode, sessionData);
     socket.join(sessionCode);
 
-    console.log(`[Host] Created Session ${sessionCode} (Passcode: ${passcode})`);
+    console.log(`[Host] Registered Session ${sessionCode} (Passcode: ${passcode})`);
 
     socket.emit('host:session-created', {
       sessionCode,
